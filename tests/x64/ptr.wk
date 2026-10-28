@@ -1,0 +1,52 @@
+# 自举第 5 步的原语演示：Ptr + 动态缓冲区（用 Whisker 自己实现扩容）+ 字符串拼接
+actor Main {
+    # 动态缓冲区句柄：数据指针 / 长度 / 容量（字段就是它的存储）
+    data: Ptr
+    length: Int = 0
+    cap: Int = 0
+
+    def buf_push[b: Int] {
+        if length == cap {
+            newcap: Int = cap * 2
+            if newcap == 0 {
+                newcap = 16
+            }
+            nd: Ptr = alloc(newcap)
+            if length > 0 {
+                copyBytes(nd, data, length)     # 旧内容搬到新块
+            }
+            data = nd
+            cap = newcap
+        }
+        store8(ptrAdd(data, length), b)
+        length = length + 1
+    }
+
+    on Start {
+        # 塞 300 个字节（0 → 16 → 32 → … 触发多次扩容）
+        for i in 0 .. 300 {
+            buf_push(65 + i % 26)
+        }
+        print("缓冲区长度 = ", length, "（期望 300）")
+        print("容量 = ", cap, "（期望 512）")
+
+        # 逐字节读回校验
+        ok: Bool = True
+        for i in 0 .. 300 {
+            if load8(ptrAdd(data, i)) != 65 + i % 26 {
+                ok = False
+            }
+        }
+        print("内容一致 = ", ok, "（期望 True）")
+
+        # 字符串拼接 + 整数转字符串
+        msg: Str = strCat(strCat("第 ", intToStr(42)), " 号")
+        print("拼接结果 = ", msg, "（期望 第 42 号）")
+        print("拼接长度(字节) = ", strLen(msg), "（期望 10）")
+        print("isNull(alloc(8)) = ", isNull(alloc(8)), "（期望 False）")
+
+        # 指针内容直接落盘
+        n: Int = writeBytes("build/ptr.bin", data, length)
+        print("写文件字节数 = ", n, "（期望 300）")
+    }
+}

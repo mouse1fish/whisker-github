@@ -1,0 +1,24 @@
+// 我自己写的用例 3：纯计算——统计素数个数（考验循环、取模、标志位控制流）
+// 语言里没有 break / continue，所以用标志位代替提前退出
+actor Main {
+    on Start {
+        limit: Int = 30000
+        count: Int = 0
+        n: Int = 2
+        while n < limit {
+            is_prime: Bool = true
+            d: Int = 2
+            while d * d <= n {
+                if is_prime && n % d == 0 {
+                    is_prime = false
+                }
+                d = d + 1
+            }
+            if is_prime {
+                count = count + 1
+            }
+            n = n + 1
+        }
+        print("小于 ", limit, " 的素数个数 = ", count, "（期望 3245）")
+    }
+}

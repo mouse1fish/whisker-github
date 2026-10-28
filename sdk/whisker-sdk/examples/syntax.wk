@@ -1,0 +1,30 @@
+# 新写法演示：这一份代码把方便的地方都用上了
+#   # 注释 · '单引号' · 1_000_000 下划线数字 · and / or / not · True / False · elif · 变量直接赋值即出现
+actor Main {
+    on Start {
+        hits: Int = 0
+        sum: Int = 0
+
+        i: Int = 1
+        while i <= 100_000 {
+            if i % 2 == 0 and i % 3 == 0 {
+                hits = hits + 1
+            } elif i % 7 == 0 or i % 11 == 0 {
+                hits = hits + 10
+            } else {
+                if not (i % 5 == 0) {
+                    sum = sum + i
+                }
+            }
+            i = i + 1
+        }
+
+        print('1..100000 统计：hits = ', hits, '（期望 200646）')
+        print("sum = ", sum, "（期望 2597497259）")
+        print('布尔演示：', True and not False, ' / ', False or True)
+
+        # 变量第一次赋值就诞生，不需要 var / let
+        message = 'hello, whisker'
+        print(message)
+    }
+}

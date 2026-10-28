@@ -1,0 +1,59 @@
+# 数组 + 文件读写：写编译器必需的两件基础设施
+actor Main {
+    total: Int = 0
+    slot: Int[8]                       # 字段数组（嵌在 actor 里，自动清零）
+
+    def fill_slot[base: Int] {
+        for i in 0 .. 8 {
+            slot[i] = base + i
+        }
+    }
+
+    def sum_arr[buf: Int[8]] -> Int {  # 数组参数按引用传
+        s: Int = 0
+        for i in 0 .. 8 {
+            s = s + buf[i]
+        }
+        return s
+    }
+
+    on Start {
+        # 1) 局部数组
+        buf: Int[16]
+        for i in 0 .. 16 {
+            buf[i] = i * i
+        }
+        s: Int = 0
+        for i in 0 .. 16 {
+            s = s + buf[i]
+        }
+        print("局部数组平方和 = ", s, "（期望 1240）")
+
+        # 2) 数组参数（引用传递）：字段数组刚声明时是清零的
+        print("字段数组初始求和 = ", sum_arr(slot), "（期望 0）")
+
+        # 3) 字段数组 + 函数写入
+        fill_slot(100)
+        print("fill_slot 之后求和 = ", sum_arr(slot), "（期望 828）")
+
+        # 4) 文件读写：字节数按「字节」算，16 个 Int 元素 = 128 字节
+        wbuf: Int[16]
+        for i in 0 .. 16 {
+            wbuf[i] = 65 + i            # 'A'..'P'
+        }
+        wrote: Int = writeFile("build/array_io.bin", wbuf, 128)
+        print("写入字节数 = ", wrote, "（期望 128）")
+
+        rbuf: Int[32]
+        got: Int = readFile("build/array_io.bin", rbuf, 256)
+        print("读回字节数 = ", got, "（期望 128）")
+
+        ok: Bool = True
+        for i in 0 .. 16 {
+            if rbuf[i] != 65 + i {
+                ok = False
+            }
+        }
+        print("逐元素一致 = ", ok, "（期望 True）")
+    }
+}

@@ -1,0 +1,26 @@
+// 有状态的 Actor + 请求/应答：Counter 的 total 只能被它自己的处理函数改
+actor Counter {
+    total: Int = 0
+
+    on Inc[n: Int] {
+        total = total + n
+    }
+
+    on Get[reply: ActorRef[Main]] {
+        reply.send(Report(total))
+    }
+}
+
+actor Main {
+    on Start {
+        c: ActorRef[Counter] = spawn Counter
+        c.send(Inc(3))
+        c.send(Inc(4))
+        c.send(Inc(35))
+        c.send(Get(self))
+    }
+
+    on Report[total: Int] {
+        print("Counter 累加结果 = ", total)
+    }
+}

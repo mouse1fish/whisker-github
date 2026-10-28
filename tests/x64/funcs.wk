@@ -1,0 +1,63 @@
+# 新特性演示：def 函数 · return · for 区间循环 · 递归 · break / continue
+actor Main {
+    base: Int = 7
+
+    def square[x: Int] -> Int {
+        return x * x
+    }
+
+    def sum_to[n: Int] -> Int {
+        s: Int = 0
+        for i in 1 ..= n {
+            s = s + i
+        }
+        return s
+    }
+
+    def fib[n: Int] -> Int {
+        if n < 2 {
+            return n
+        }
+        return fib(n - 1) + fib(n - 2)
+    }
+
+    def first_multiple_over[step: Int, limit: Int] -> Int {
+        v: Int = 0
+        while True {
+            v = v + 1
+            if v % step == 0 and v > limit {
+                break
+            }
+        }
+        return v
+    }
+
+    def count_odds_to[n: Int] -> Int {
+        c: Int = 0
+        for i in 1 ..= n {
+            if i % 2 == 0 {
+                continue
+            }
+            c = c + 1
+        }
+        return c
+    }
+
+    def half_range[n: Int] {          # 没有 -> 就是没有返回值
+        print("n 的一半 = ", n / 2)
+    }
+
+    on Start {
+        print("square(9) = ", square(9), "（期望 81）")
+        print("sum_to(100) = ", sum_to(100), "（期望 5050）")
+        print("fib(20) = ", fib(20), "（期望 6765）")
+        print("first_multiple_over[7, 100] = ", first_multiple_over(7, 100), "（期望 105）")
+        print("count_odds_to(100) = ", count_odds_to(100), "（期望 50）")
+        print("字段参与计算：base + square(3) = ", base + square(3), "（期望 16）")
+        print("不含上界的循环：")
+        for k in 0 .. 3 {
+            print("  k = ", k, "（期望 0 1 2）")
+        }
+        half_range(100)
+    }
+}

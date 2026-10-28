@@ -1,0 +1,15 @@
+// 反例 1：给 Counter 发一个它没有声明的消息 —— 应该在编译期被抓出来
+actor Counter {
+    total: Int = 0
+
+    on Inc[n: Int] {
+        total = total + n
+    }
+}
+
+actor Main {
+    on Start {
+        c: ActorRef[Counter] = spawn Counter
+        c.send(Decrement(1))
+    }
+}

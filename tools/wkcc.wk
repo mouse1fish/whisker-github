@@ -1,0 +1,1980 @@
+# wkcc —— 用 Whisker 写的 Whisker 编译器（自举第 9 步：一遍式代码发射）
+# 读取 build\lex_input.txt（.wk 源码），产出 build\selfhost.exe
+# 语法导向翻译：边解析边发射机器码，不需要真的建 AST 树。
+
+actor Main {
+    # ================= 词法状态 =================
+    src: Ptr
+    limit: Int = 0
+    pos: Int = 0
+    depth: Int = 0
+    tkKind: Int[65536]
+    tkText: Str[65536]
+    count: Int = 0
+    kws: Str[32]
+    puns: Str[40]
+    pi: Int = 0
+
+    K_INT: Int = 0
+    K_STR: Int = 1
+    K_IDENT: Int = 2
+    K_KW: Int = 3
+    K_PUNC: Int = 4
+    K_NL: Int = 5
+    K_EOF: Int = 6
+    OFF_RT_INIT: Int = 44
+    OFF_ACTOR_NEW: Int = 632
+    OFF_SEND: Int = 670
+    OFF_RUN: Int = 1294
+    OFF_PBEGIN: Int = 1399
+    OFF_PRINT_INT: Int = 1569
+    OFF_PRINT_END: Int = 1807
+    OFF_PCSTR: Int = 1500
+    OFF_PBOOL: Int = 1739
+    OFF_PSTR: Int = 1437
+    OFF_ALLOC: Int = 404
+    OFF_STR_CAT: Int = 2352
+    OFF_STR_LEN: Int = 2300
+    OFF_INT_TO_STR: Int = 2491
+    OFF_STR_TO_INT: Int = 2799
+    OFF_COPY: Int = 2916
+    OFF_READ_BYTES: Int = 1977
+    OFF_WRITE_BYTES: Int = 2140
+    OFF_ZERO: Int = 1897
+    OFF_BOUNDS_FAIL: Int = 1931
+    OFF_STR_EQ: Int = 3014
+    OFF_NOW_MS: Int = 2948
+    RT_TEXT_LEN: Int = 3086
+    RT_RDATA_LEN: Int = 482
+    RT_DATA_LEN: Int = 17280
+    RT_DATA_OFF: Int = 3568
+    RDATA_RVA: Int = 69632
+    DATA_RVA: Int = 135168
+    IMAGE_SIZE: Int = 200704
+    IAT_RVA: Int = 152320
+    IAT_IN_DATA: Int = 17152
+    NIMPORT: Int = 15
+    USER_OFF: Int = 4096
+
+
+    # ================= 代码发射缓冲 =================
+    cbuf: Ptr                  # 用户代码区（64KB，.text 里 blob 之后）
+    cw: Int = 0                # 用户代码写偏移
+    USER_RVA: Int = 8192       # 0x2000 = TEXT_RVA + USER_OFF：用户代码区起始 RVA（.text 内 blob 之后）
+    entryPos: Int = 0          # entry 代码在用户代码区内的偏移（所有 actor 之后发射）
+    TEXT_RVA: Int = 4096       # 0x1000
+
+    # ================= .rdata 字符串区 =================
+    rbuf: Ptr                  # .rdata 区（64KB）
+    rw: Int = 0                # .rdata 写偏移（从 blob rdata 之后开始 = 482 + impSize）
+    rdataStrBase: Int = 0      # 字符串区的起始 .rdata 偏移
+
+    # ================= PE 输出 =================
+    impSize: Int = 0
+    # ---- 自举编译器状态 ----
+    fxSite: Int[2048]
+    fxLabel: Int[2048]
+    fxCount: Int = 0
+    lbId: Int[2048]
+    lbPos: Int[2048]
+    nlb: Int = 0
+    nextLbId: Int = 0
+    loopStack: Int[256]
+    loopDepth: Int = 0
+    actName: Str[64]
+    actSize: Int[64]
+    actDisp: Int[64]
+    actCount: Int = 0
+    fldName: Str[256]
+    fldOff: Int[256]
+    fldCount: Int = 0
+    hName: Str[64]
+    hTag: Int[64]
+    hNParam: Int[64]
+    hPos: Int[64]
+    hCount: Int = 0
+    fnName: Str[128]
+    fnPos: Int[128]
+    fnNParam: Int[128]
+    fnCount: Int = 0
+    curActor: Int = 0
+    blob: Ptr
+    out: Ptr
+    w: Int = 0
+    hintRVA: Int[16]
+    inames: Str[16]
+    # ---- 局部变量表（函数级扁平，同名复用槽）----
+    localName: Str[256]
+    localDisp: Int[256]     # [rbp + disp]（disp 为负）
+    localTy: Str[256]       # "Int"/"Str"/"Ptr"/"Int[N]" 等
+    localArrN: Int[256]     # 数组大小（0=标量）
+    localCount: Int = 0
+    localStackTop: Int = 0  # 当前已用栈字节（负向增长）
+    curSubSite: Int = 0     # 当前函数 sub rsp,imm32 的立即数位点（cw），parseBlock 后回填
+    fldTy: Str[256]         # 字段类型
+    fldArrN: Int[256]       # 字段数组大小（0=标量）
+    fnRetTy: Str[128]        # def 返回类型
+    lastTy: Str = "Int"     # 最近一次表达式求值的类型（判 Str== 用）
+    forSeq: Int = 0         # for 隐藏上限槽计数
+    seqName: Str[16]        # 隐藏槽名字池
+    curRetTy: Str = "Int"   # 当前函数返回类型
+    # ---- 下标/数组基址延迟发射状态 ----
+    lastArrBase: Int = -1   # -1=无 1=字段数组[rbx+off] 2=局部数组[rbp+d]
+    lastArrOff: Int = 0
+    lastArrN: Int = 0
+    lastArrTy: Str = "Int"
+    fldInitVal: Int[256]    # 字段常量初值（entry 初始化用）
+    fldHasInit: Int[256]
+    # ---- 前向调用占位（def 定义在调用之后时，先占位后回填）----
+    ufSite: Int[2048]
+    ufName: Str[2048]
+    ufCount: Int = 0
+
+    def setupNames {
+        inames[0] = "GetStdHandle"
+        inames[1] = "WriteFile"
+        inames[2] = "VirtualAlloc"
+        inames[3] = "QueryPerformanceCounter"
+        inames[4] = "QueryPerformanceFrequency"
+        inames[5] = "CreateThread"
+        inames[6] = "GetSystemInfo"
+        inames[7] = "Sleep"
+        inames[8] = "ExitProcess"
+        inames[9] = "CreateEventA"
+        inames[10] = "SetEvent"
+        inames[11] = "WaitForSingleObject"
+        inames[12] = "CreateFileA"
+        inames[13] = "ReadFile"
+        inames[14] = "CloseHandle"
+    }
+
+    # ================= 词法（与之前版本相同） =================
+    def setup {
+        kws[0] = "actor"
+        kws[1] = "on"
+        kws[2] = "if"
+        kws[3] = "else"
+        kws[4] = "elif"
+        kws[5] = "while"
+        kws[6] = "for"
+        kws[7] = "in"
+        kws[8] = "spawn"
+        kws[9] = "self"
+        kws[10] = "return"
+        kws[11] = "break"
+        kws[12] = "continue"
+        kws[13] = "def"
+        kws[14] = "and"
+        kws[15] = "or"
+        kws[16] = "not"
+        kws[17] = "true"
+        kws[18] = "false"
+        kws[19] = "True"
+        kws[20] = "False"
+        kws[21] = "var"
+        kws[22] = "let"
+        puns[0] = "..="
+        puns[1] = ".."
+        puns[2] = "->"
+        puns[3] = "&&"
+        puns[4] = "||"
+        puns[5] = "=="
+        puns[6] = "!="
+        puns[7] = "<="
+        puns[8] = ">="
+        puns[9] = "("
+        puns[10] = ")"
+        puns[11] = "{"
+        puns[12] = "}"
+        puns[13] = "["
+        puns[14] = "]"
+        puns[15] = ","
+        puns[16] = ":"
+        puns[17] = ";"
+        puns[18] = "="
+        puns[19] = "<"
+        puns[20] = ">"
+        puns[21] = "+"
+        puns[22] = "-"
+        puns[23] = "*"
+        puns[24] = "/"
+        puns[25] = "%"
+        puns[26] = "!"
+        puns[27] = "."
+        puns[28] = "?"
+        inames[0] = "GetStdHandle"
+        inames[1] = "WriteFile"
+        inames[2] = "VirtualAlloc"
+        inames[3] = "QueryPerformanceCounter"
+        inames[4] = "QueryPerformanceFrequency"
+        inames[5] = "CreateThread"
+        inames[6] = "GetSystemInfo"
+        inames[7] = "Sleep"
+        inames[8] = "ExitProcess"
+        inames[9] = "CreateEventA"
+        inames[10] = "SetEvent"
+        inames[11] = "WaitForSingleObject"
+        inames[12] = "CreateFileA"
+        inames[13] = "ReadFile"
+        inames[14] = "CloseHandle"
+    }
+
+    def peek[o: Int] -> Int {
+        if pos + o >= limit {
+            return 0
+        }
+        return load8(ptrAdd(src, pos + o))
+    }
+
+    def advance[n: Int] {
+        pos = pos + n
+    }
+
+    def isDigit[c: Int] -> Bool { return c >= 48 and c <= 57 }
+    def isHex[c: Int] -> Bool {
+        if isDigit(c) { return True }
+        return (c >= 97 and c <= 102) or (c >= 65 and c <= 70)
+    }
+    def isAlpha[c: Int] -> Bool {
+        if c == 95 { return True }
+        return (c >= 97 and c <= 122) or (c >= 65 and c <= 90)
+    }
+    def isAlnum[c: Int] -> Bool {
+        if isDigit(c) { return True }
+        return isAlpha(c)
+    }
+    def isSpace[c: Int] -> Bool { return c == 32 or c == 9 or c == 13 }
+
+    def srcHas[s: Str] -> Bool {
+        i: Int = 0
+        while load8(ptrAdd(strPtr(s), i)) != 0 {
+            if pos + i >= limit { return False }
+            if load8(ptrAdd(src, pos + i)) != load8(ptrAdd(strPtr(s), i)) { return False }
+            i = i + 1
+        }
+        return True
+    }
+
+    def copyFromSrc[at: Int, len: Int] -> Str {
+        p: Ptr = alloc(len + 1)
+        i: Int = 0
+        while i < len {
+            store8(ptrAdd(p, i), load8(ptrAdd(src, at + i)))
+            i = i + 1
+        }
+        store8(ptrAdd(p, len), 0)
+        return ptrToStr(p)
+    }
+
+    def pushTok[k: Int, text: Str] {
+        tkKind[count] = k
+        tkText[count] = text
+        count = count + 1
+    }
+
+    def loadSrc[path: Str] -> Int {
+        cap: Int = 1048576
+        p: Ptr = alloc(cap + 1)
+        n: Int = readBytes(path, p, cap)
+        if n < 0 { return -1 }
+        store8(ptrAdd(p, n), 0)
+        src = p
+        limit = n
+        pos = 0
+        return n
+    }
+
+    def lexNumber {
+        start: Int = pos
+        if peek(0) == 48 and (peek(1) == 120 or peek(1) == 88) {
+            advance(2)
+            while isHex(peek(0)) or peek(0) == 95 { advance(1) }
+            v: Int = 0
+            p2: Int = start + 2
+            while p2 < pos {
+                ch: Int = load8(ptrAdd(src, p2))
+                if ch != 95 {
+                    d: Int = 0
+                    if ch >= 97 { d = ch - 87 } elif ch >= 65 { d = ch - 55 } else { d = ch - 48 }
+                    v = v * 16 + d
+                }
+                p2 = p2 + 1
+            }
+            pushTok(K_INT, intToStr(v))
+        } else {
+            while isDigit(peek(0)) or peek(0) == 95 { advance(1) }
+            p: Ptr = alloc(pos - start + 1)
+            w2: Int = 0
+            r: Int = start
+            while r < pos {
+                ch2: Int = load8(ptrAdd(src, r))
+                if ch2 != 95 {
+                    store8(ptrAdd(p, w2), ch2)
+                    w2 = w2 + 1
+                }
+                r = r + 1
+            }
+            store8(ptrAdd(p, w2), 0)
+            pushTok(K_INT, ptrToStr(p))
+        }
+    }
+
+    def lexString {
+        quote: Int = peek(0)
+        advance(1)
+        tmp: Int[512]
+        tl: Int = 0
+        closed: Bool = False
+        while pos < limit {
+            ch: Int = peek(0)
+            if ch == quote { advance(1); closed = True; break }
+            if ch == 10 { break }
+            if ch == 92 {
+                if pos + 1 >= limit { break }
+                e: Int = peek(1)
+                if e == 110 { tmp[tl] = 10; tl = tl + 1
+                } elif e == 116 { tmp[tl] = 9; tl = tl + 1
+                } elif e == 114 { tmp[tl] = 13; tl = tl + 1
+                } elif e == 34 { tmp[tl] = 34; tl = tl + 1
+                } elif e == 39 { tmp[tl] = 39; tl = tl + 1
+                } elif e == 92 { tmp[tl] = 92; tl = tl + 1
+                } elif e == 48 { tmp[tl] = 0; tl = tl + 1 }
+                advance(2)
+            } else {
+                tmp[tl] = ch
+                tl = tl + 1
+                advance(1)
+            }
+        }
+        if closed {
+            p: Ptr = alloc(tl + 1)
+            i: Int = 0
+            while i < tl { store8(ptrAdd(p, i), tmp[i]); i = i + 1 }
+            store8(ptrAdd(p, tl), 0)
+            pushTok(K_STR, ptrToStr(p))
+        }
+    }
+
+    def lexWord {
+        start: Int = pos
+        while isAlnum(peek(0)) { advance(1) }
+        s: Str = copyFromSrc(start, pos - start)
+        isKw: Bool = False
+        i: Int = 0
+        while i < 23 {
+            if kws[i] == s { isKw = True }
+            i = i + 1
+        }
+        if isKw { pushTok(K_KW, s) } else { pushTok(K_IDENT, s) }
+    }
+
+    def lexPunc {
+        i: Int = 0
+        while i < 29 {
+            if srcHas(puns[i]) {
+                if puns[i] == "(" { depth = depth + 1 }
+                if puns[i] == "[" { depth = depth + 1 }
+                if puns[i] == ")" { if depth > 0 { depth = depth - 1 } }
+                if puns[i] == "]" { if depth > 0 { depth = depth - 1 } }
+                pushTok(K_PUNC, puns[i])
+                advance(strLen(puns[i]))
+                return
+            }
+            i = i + 1
+        }
+        advance(1)
+    }
+
+    def lex {
+        while pos < limit {
+            c: Int = peek(0)
+            if isSpace(c) { advance(1); continue }
+            if c == 10 {
+                advance(1)
+                if depth == 0 {
+                    if count > 0 {
+                        if tkKind[count - 1] != K_NL { pushTok(K_NL, "") }
+                    }
+                }
+                continue
+            }
+            if c == 35 {
+                while pos < limit and peek(0) != 10 { advance(1) }
+                continue
+            }
+            if c == 47 and peek(1) == 47 {
+                while pos < limit and peek(0) != 10 { advance(1) }
+                continue
+            }
+            if c == 47 and peek(1) == 42 {
+                advance(2)
+                while pos < limit {
+                    if peek(0) == 42 and peek(1) == 47 { advance(2); break }
+                    advance(1)
+                }
+                continue
+            }
+            if c == 34 or c == 39 { lexString(); continue }
+            if isDigit(c) { lexNumber(); continue }
+            if isAlpha(c) { lexWord(); continue }
+            lexPunc()
+        }
+        if depth == 0 {
+            if count > 0 {
+                if tkKind[count - 1] != K_NL { pushTok(K_NL, "") }
+            }
+        }
+        pushTok(K_EOF, "<eof>")
+    }
+
+    # ================= token 访问 =================
+    def pk[k: Int] -> Int {
+        if pi + k >= count { return K_EOF }
+        return tkKind[pi + k]
+    }
+
+    def pt[k: Int] -> Str {
+        if pi + k >= count { return "<eof>" }
+        return tkText[pi + k]
+    }
+
+    def tAdvance { pi = pi + 1 }
+    def tSkipNl { while tkKind[pi] == K_NL { pi = pi + 1 } }
+    def tIs[text: Str] -> Bool { return pt(0) == text }
+    def tIsKw[text: Str] -> Bool { if pk(0) == K_KW { return pt(0) == text } return False }
+    def tIsPunc[text: Str] -> Bool { if pk(0) == K_PUNC { return pt(0) == text } return False }
+    def tExpect[text: Str] {
+        if tIs(text) { tAdvance() } else {
+            print("[wkcc] 期望 ", text, " 遇到 ", pt(0))
+            tAdvance()
+        }
+    }
+    def err[msg: Str] {
+        print("[wkcc] pi=", intToStr(pi), " ", msg, "（附近：", pt(0), "）")
+        print("[ctx] ", pt(-4), " | ", pt(-3), " | ", pt(-2), " | ", pt(-1), " | ", pt(0), " | ", pt(1))
+        tAdvance()
+    }
+
+    def endStmt {
+        saw: Int = 0
+        while tIsPunc(";") or pk(0) == K_NL { tAdvance(); saw = 1 }
+        if saw == 0 {
+            if tIsPunc("}") == False and pk(0) != K_EOF { err("语句结束处需要换行") }
+        }
+    }
+
+    # ================= 代码发射原语 =================
+    def e8[b: Int] { store8(ptrAdd(cbuf, cw), b % 256); cw = cw + 1 }
+    def e32[v: Int] {
+        u: Int = v
+        if u < 0 { u = u + 4294967296 }
+        store8(ptrAdd(cbuf, cw), u % 256)
+        store8(ptrAdd(cbuf, cw + 1), (u / 256) % 256)
+        store8(ptrAdd(cbuf, cw + 2), (u / 65536) % 256)
+        store8(ptrAdd(cbuf, cw + 3), (u / 16777216) % 256)
+        cw = cw + 4
+    }
+    def eCallRt[off: Int] { e8(232); e32(4096 + off - (USER_RVA + cw + 4)) }
+    def eCallUser[pos: Int] { e8(232); e32(USER_RVA + pos - (USER_RVA + cw + 4)) }
+    def eJmp[pos: Int] { e8(233); e32(USER_RVA + pos - (USER_RVA + cw + 4)) }
+    def eJmpFwd[id: Int] { e8(233); fxSite[fxCount] = cw; fxLabel[fxCount] = id; fxCount = fxCount + 1; e32(0) }
+    def eJccFwd[cc: Int, id: Int] {
+        e8(15)
+        e8(128 + cc)
+        fxSite[fxCount] = cw
+        fxLabel[fxCount] = id
+        fxCount = fxCount + 1
+        e32(0)
+    }
+    def eLeaRcv[dst: Int, target: Int] {
+        # lea reg, [rip+disp32]：dst=寄存器编号(0=rax..7=rdi, 8=r8..)，target=目标 RVA
+        if dst < 8 {
+            store8(ptrAdd(cbuf, cw), 72)
+            store8(ptrAdd(cbuf, cw + 1), 141)
+            store8(ptrAdd(cbuf, cw + 2), 5 + dst * 8)
+        } else {
+            store8(ptrAdd(cbuf, cw), 76)
+            store8(ptrAdd(cbuf, cw + 1), 141)
+            store8(ptrAdd(cbuf, cw + 2), 5 + (dst - 8) * 8)
+        }
+        cw = cw + 3
+        e32(target - (USER_RVA + cw + 4))
+    }
+    def eMovRcxImm[v: Int] {
+        e8(72); e8(199); e8(193); e32(v)
+    }
+    def eMark[id: Int] {
+        i: Int = 0
+        while i < nlb {
+            if lbId[i] == id { lbPos[i] = cw; return }
+            i = i + 1
+        }
+    }
+    def newLb -> Int {
+        id: Int = nextLbId
+        lbId[nlb] = id
+        lbPos[nlb] = -1
+        nlb = nlb + 1
+        nextLbId = nextLbId + 1
+        return id
+    }
+    # 前向调用回填：所有 actor 解析完后调用（fnPos 已齐）
+    def resolveFnFx {
+        i: Int = 0
+        while i < ufCount {
+            site: Int = ufSite[i]
+            fi: Int = findFn(ufName[i])
+            if fi < 0 or fnPos[fi] < 0 {
+                err(strCat("未定义的函数 ", ufName[i]))
+                i = i + 1
+                continue
+            }
+            rel: Int = fnPos[fi] - (site + 4)
+            u: Int = rel
+            if u < 0 { u = u + 4294967296 }
+            store8(ptrAdd(cbuf, site), u % 256)
+            store8(ptrAdd(cbuf, site + 1), (u / 256) % 256)
+            store8(ptrAdd(cbuf, site + 2), (u / 65536) % 256)
+            store8(ptrAdd(cbuf, site + 3), (u / 16777216) % 256)
+            i = i + 1
+        }
+    }
+
+    def resolveFx {
+        i: Int = 0
+        while i < fxCount {
+            site: Int = fxSite[i]
+            lid: Int = fxLabel[i]
+            if lid == -3 {
+                # jae → rt_bounds_fail（运行时越界处理，不返回）
+                rel: Int = TEXT_RVA + OFF_BOUNDS_FAIL - (USER_RVA + site + 4)
+                u: Int = rel
+                if u < 0 { u = u + 4294967296 }
+                store8(ptrAdd(cbuf, site), u % 256)
+                store8(ptrAdd(cbuf, site + 1), (u / 256) % 256)
+                store8(ptrAdd(cbuf, site + 2), (u / 65536) % 256)
+                store8(ptrAdd(cbuf, site + 3), (u / 16777216) % 256)
+                i = i + 1
+                continue
+            }
+            j: Int = 0
+            while j < nlb {
+                if lbId[j] == lid {
+                    if lbPos[j] >= 0 {
+                        rel: Int = USER_RVA + lbPos[j] - (USER_RVA + site + 4)
+                        u: Int = rel
+                        if u < 0 { u = u + 4294967296 }
+                        store8(ptrAdd(cbuf, site), u % 256)
+                        store8(ptrAdd(cbuf, site + 1), (u / 256) % 256)
+                        store8(ptrAdd(cbuf, site + 2), (u / 65536) % 256)
+                        store8(ptrAdd(cbuf, site + 3), (u / 16777216) % 256)
+                    }
+                    break
+                }
+                j = j + 1
+            }
+            i = i + 1
+        }
+    }
+
+    # ================= 入口 =================
+    def main {
+        setup()
+        n: Int = loadSrc("build/lex_input.txt")
+        if n < 0 { print("read fail"); return }
+
+        # 读运行时 blob
+        blob = alloc(RT_DATA_OFF + RT_DATA_LEN + 16)
+        readBytes("build/rt_blob.bin", blob, RT_DATA_OFF + RT_DATA_LEN)
+
+        # 分配用户代码区（64KB）和 .rdata 区（64KB）
+        cbuf = alloc(65536)
+        rbuf = alloc(65536)
+
+        # .rdata 布局：blob rdata (482B) + 导入表结构 + 字符串区
+        # 导入结构大小：idesc 40 + ILT 8*16 + dllname 13 + hints（动态计算）
+        impSize = 40 + 8 * (NIMPORT + 1) + 13
+        i: Int = 0
+        while i < NIMPORT {
+            impSize = impSize + 2 + strLen(inames[i]) + 1
+            i = i + 1
+        }
+        rdataStrBase = RT_RDATA_LEN + impSize
+
+        lex()
+        parseProgram()
+        resolveFx()
+        resolveFnFx()
+
+        # ---- 写 PE ----
+        buildPe()
+    }
+
+    def parseProgram {
+        tSkipNl()
+        n: Int = 0
+        while pk(0) != K_EOF {
+            if tIsKw("actor") {
+                parseActor()
+                n = n + 1
+            } else {
+                err("顶层只允许 actor 声明")
+            }
+            tSkipNl()
+        }
+        sacr: Int = 0
+        # ==== entry 发射（所有 actor 之后）====
+        # and rsp, -16：入口 RSP≡8（call 约定），ABI 要求 call 前 RSP≡0。
+        # entry 不会返回（直接 TerminateProcess），可以自由重对齐。
+        mainDisp: Int = actDisp[0]
+        mainSize: Int = actSize[0]
+        entryPos = cw
+        # and rsp, -16（48 83 E4 F0）：入口 RSP≡8，ABI 要求 call 前 RSP≡0；
+        # entry 不返回（TerminateProcess 结束），可自由重对齐
+        e8(72); e8(131); e8(228); e8(240)
+        # call rt_init
+        eCallRt(OFF_RT_INIT)
+        # 创建 Main actor
+        # lea rcx, [rip + dispatch_offset]（dispatch 在用户代码区）
+        e8(72); e8(141); e8(13)
+        e32(USER_RVA + mainDisp - (USER_RVA + cw + 4))
+        # mov rdx, actor_size
+        e8(72); e8(199); e8(194); e32(mainSize)
+        # call rt_actor_new
+        eCallRt(OFF_ACTOR_NEW)
+        # 保存 actor 指针到 rbx
+        e8(72); e8(137); e8(195)          # mov rbx, rax（暂存 actor ptr）
+        # ---- Main 标量字段初始化：mov qword [rbx+off32], imm32（48 C7 83）----
+        fw: Int = 0
+        while fw < fldCount {
+            if fldArrN[fw] == 0 {
+                e8(72); e8(199); e8(131)
+                e32(fldOff[fw])
+                v2: Int = 0
+                if fldHasInit[fw] == 1 { v2 = fldInitVal[fw] }
+                e32(v2)
+            }
+            fw = fw + 1
+        }
+        # 分配信封（16 字节 = tag + link）
+        e8(72); e8(199); e8(193); e32(16) # mov rcx, 16
+        eCallRt(OFF_ALLOC)                # rax = envelope
+        # 设置 tag = 1（Start）：48 C7 00 imm32（REX.W → qword 写入）
+        e8(72); e8(199); e8(0); e32(1)     # mov qword [rax], 1
+        # 设置 link = 0：48 C7 40 08 imm32
+        e8(72); e8(199); e8(64); e8(8); e32(0)   # mov qword [rax+8], 0
+        # 发送：mov rdx, rax（信封）; mov rcx, rbx（actor）; call rt_send
+        e8(72); e8(137); e8(194)          # mov rdx, rax
+        e8(72); e8(137); e8(217)          # mov rcx, rbx
+        eCallRt(OFF_SEND)
+        # 运行调度器
+        eCallRt(OFF_RUN)
+        # 退出
+        e8(72); e8(199); e8(193); e32(0)  # mov rcx, 0
+        # call ExitProcess（通过 IAT，slot 8 = IAT_RVA + 64）
+        # RIP = 指令末 = cw + 4（cw 已过 FF 15 两字节，指令共 6 字节）
+        e8(255); e8(21)
+        e32(IAT_RVA + 64 - (USER_RVA + cw + 4))
+    }
+    # 预扫当前 actor 的 def 签名：登记 fnName/fnNParam/fnRetTy（fnPos 留 -1，正式解析时填）
+    def prescanFuncs {
+        save: Int = pi
+        depth: Int = 0
+        while pk(0) != K_EOF {
+            if tIsPunc("{") { depth = depth + 1; tAdvance(); continue }
+            if tIsPunc("}") {
+                if depth == 0 { break }        # actor 顶层结束
+                depth = depth - 1
+                tAdvance()
+                continue
+            }
+            if tIsKw("def") {
+                nm: Str = pt(1)
+                tAdvance()                     # def
+                # nm 已登记？跳过其签名直到 {（正式解析时补 fnPos）
+                if findFn(nm) >= 0 {
+                    while pk(0) != K_EOF and tIsPunc("{") == False { tAdvance() }
+                    continue
+                }
+                tAdvance()                     # 名字
+                fnName[fnCount] = nm
+                np: Int = 0
+                if tIsPunc("[") {
+                    tAdvance()
+                    while pk(0) != K_EOF and tIsPunc("]") == False {
+                        if pk(0) == K_IDENT { np = np + 1 }
+                        tAdvance()
+                    }
+                    tAdvance()                 # ]
+                }
+                fnNParam[fnCount] = np
+                fnRetTy[fnCount] = "Int"
+                if tIsPunc("->") {
+                    tAdvance()
+                    rt2: Str = pt(0)
+                    tAdvance()
+                    if rt2 == "ActorRef" {
+                        tAdvance(); tAdvance()
+                    } elif tIsPunc("[") {
+                        tAdvance(); tAdvance(); tAdvance()
+                    }
+                    fnRetTy[fnCount] = rt2
+                }
+                fnPos[fnCount] = -1
+                fnCount = fnCount + 1
+                continue
+            }
+            tAdvance()
+        }
+        pi = save
+    }
+
+    def parseActor {
+        tAdvance()            # 跳过 'actor' 关键字
+        name: Str = pt(0)     # actor 名字
+        tAdvance()
+        tExpect("{")
+        tSkipNl()
+        curActor = actCount
+        actName[actCount] = name
+        fldCount = 0
+        hCount = 0
+        fnCount = 0
+        actSize[actCount] = 48
+        actCount = actCount + 1
+        prescanFuncs()   # 预扫 def 签名（前向调用需要名字/参数/返回类型）
+        tSkipNl()
+        while tIsPunc("}") == False {
+            if pk(0) == K_EOF { break }
+            if tIsKw("on") {
+                parseHandler()
+            } elif tIsKw("def") {
+                parseFunc()
+            } elif tIsKw("var") or tIsKw("let") {
+                tAdvance()
+                parseField()
+            } elif pk(0) == K_IDENT {
+                parseField()
+            } else {
+                err("actor 主体异常")
+            }
+            tSkipNl()
+        }
+        tExpect("}")
+        # ==== dispatch 发射（所有 handler 解析完后）====
+        # dispatch(rcx=self, rdx=payload) → 按 tag 跳转到 handler
+        # 栈布局（push 后）：[rsp+0]=payload, [rsp+8]=self
+        actDisp[curActor] = cw
+        # 保存 self 和 payload：push rcx; push rdx → 51 52
+        e8(81); e8(82)
+        # sub rsp, 8（补齐 16 对齐：entry≡8 + 3*8 → 调用点 ≡0）
+        e8(72); e8(131); e8(236); e8(8)
+        # 加载 tag: mov rax, [rdx] = 48 8B 02
+        e8(72); e8(139); e8(2)
+        # 比较每个 handler 的 tag
+        hi: Int = 0
+        caseLb: Int[64]
+        doneLb: Int = newLb()
+        while hi < hCount {
+            e8(72); e8(131); e8(248); e8(hi + 1)   # cmp rax, hi+1
+            caseLb[hi] = newLb()
+            eJccFwd(4, caseLb[hi])                 # je case_i (cc=4 → je)
+            hi = hi + 1
+        }
+        eJmpFwd(doneLb)
+        # 每个 case：提取参数并调用 handler
+        hi = 0
+        while hi < hCount {
+            eMark(caseLb[hi])
+            # rcx = self：mov rcx, [rsp+16] = 48 8B 4C 24 10
+            e8(72); e8(139); e8(76); e8(36); e8(16)
+            # rax = payload：mov rax, [rsp+8] = 48 8B 44 24 08
+            e8(72); e8(139); e8(68); e8(36); e8(8)
+            # 从 payload 提取参数到 rdx/r8/r9（参数从 env+16 开始）
+            np2: Int = hNParam[hi]
+            if np2 > 0 {
+                e8(72); e8(139); e8(82); e32(16)          # mov rdx, [rax+16]
+            }
+            if np2 > 1 {
+                e8(76); e8(139); e8(64); e8(24)          # mov r8, [rax+24] = 4C 8B 40 18
+            }
+            if np2 > 2 {
+                e8(76); e8(139); e8(72); e8(32)          # mov r9, [rax+32] = 4C 8B 48 20
+            }
+            eCallUser(hPos[hi])
+            eJmpFwd(doneLb)
+            hi = hi + 1
+        }
+        eMark(doneLb)
+        # 清理栈：add rsp, 24（payload+self+对齐槽）→ 48 83 C4 18
+        e8(72); e8(131); e8(196); e8(24)
+        e8(195)                           # ret
+    }
+
+    def parseField {
+        name: Str = pt(0)
+        tAdvance()
+        tExpect(":")
+        ty: Str = pt(0)
+        tAdvance()
+        arrN: Int = 0
+        if ty == "ActorRef" {
+            tExpect("[")
+            tAdvance()
+            tExpect("]")
+        } elif tIsPunc("[") {
+            tAdvance()
+            arrN = strToInt(pt(0))
+            tAdvance()
+            tExpect("]")
+        }
+        hasInit: Int = 0
+        initV: Int = 0
+        if tIsPunc("=") {
+            tAdvance()
+            hasInit = 1
+            # 字段初值仅支持常量字面量（entry 处统一初始化，不在此发射）
+            k2: Int = pk(0)
+            if k2 == K_INT {
+                initV = strToInt(pt(0))
+                tAdvance()
+            } elif k2 == K_PUNC and pt(0) == "-" {
+                tAdvance()
+                initV = 0 - strToInt(pt(0))
+                tAdvance()
+            } elif k2 == K_STR {
+                initV = addStr(pt(0))
+                tAdvance()
+            } elif k2 == K_KW and tIs("true") {
+                initV = 1
+                tAdvance()
+            } elif k2 == K_KW and tIs("false") {
+                initV = 0
+                tAdvance()
+            } else {
+                err("字段初值仅支持常量")
+            }
+        }
+        endStmt()
+        # 字段偏移累加：标量 8 字节，数组 N*8 字节
+        fldName[fldCount] = name
+        fldTy[fldCount] = ty
+        fldArrN[fldCount] = arrN
+        fldOff[fldCount] = actSize[curActor]
+        fldHasInit[fldCount] = hasInit
+        fldInitVal[fldCount] = initV
+        sz: Int = 8
+        if arrN > 0 { sz = 8 * arrN }
+        actSize[curActor] = actSize[curActor] + sz
+        fldCount = fldCount + 1
+    }
+
+    def parseHandler {
+        tAdvance()                       # on
+        name: Str = pt(0)
+        tAdvance()
+        localCount = 0
+        localStackTop = 0
+        np: Int = parseParamsOpt()
+        curRetTy = "Int"
+        # 记录 handler 入口位置（dispatch 跳到这里）
+        hPos[hCount] = cw
+        # 序言：push rbp; mov rbp, rsp; sub rsp, imm32; push rbx; mov rbx, rcx
+        e8(85)                            # push rbp
+        e8(72); e8(137); e8(229)          # mov rbp, rsp
+        e8(72); e8(129); e8(236)
+        curSubSite = cw                   # 记录 imm32 位点，parseBlock 后按实际帧回填
+        e32(4104)                         # sub rsp, 占位（4096+8；真实大小见 patchFrameSize）
+        e8(83)                            # push rbx（跨 rt 调用保护）
+        e8(72); e8(137); e8(203)          # mov rbx, rcx（self）
+        emitLoadArgs(np)               # 参数 rdx/r8/r9 → 局部槽
+        parseBlock()
+        patchFrameSize()
+        emitEpilogue()
+        hName[hCount] = name
+        hTag[hCount] = hCount + 1
+        hNParam[hCount] = np
+        hCount = hCount + 1
+    }
+
+    def emitEpilogue {
+        # pop rbx; mov rsp, rbp; pop rbp; ret
+        e8(91)                            # pop rbx
+        e8(72); e8(137); e8(236)          # mov rsp, rbp
+        e8(93)                            # pop rbp
+        e8(195)                           # ret
+    }
+
+    # 按实际局部槽深度回填当前函数的 sub rsp,imm32。
+    # 帧必须盖住最深层局部（dmax = -localStackTop），且 S ≡ 8 (mod 16)
+    # 以维持"push rbx 后 RSP≡0"的调用点对齐。历史 bug：帧大小写死 4104，
+    # lexString 的 tmp:Int[512]（4096B）把后续局部挤到 saved-rbx 槽上，
+    # 尾声 pop rbx 弹出局部值（如字符串字节长 0x13）→ 调用方 self 被污染。
+    def patchFrameSize {
+        dmax: Int = 0 - localStackTop
+        s2: Int = ((dmax + 24) / 16) * 16 + 8
+        store8(ptrAdd(cbuf, curSubSite), s2 % 256)
+        store8(ptrAdd(cbuf, curSubSite + 1), (s2 / 256) % 256)
+        store8(ptrAdd(cbuf, curSubSite + 2), (s2 / 65536) % 256)
+        store8(ptrAdd(cbuf, curSubSite + 3), (s2 / 16777216) % 256)
+    }
+
+    # def/handler 参数装入局部槽：参数1→rdx、参数2→r8、参数3→r9（rcx=self）
+    def emitLoadArgs[np: Int] {
+        li: Int = localCount - np
+        regIdx: Int = 1
+        while li < localCount {
+            d: Int = localDisp[li]
+            # mov [rbp+disp32], reg：rdx=48 89 95 / r8=4C 89 85 / r9=4C 89 8D（r8/r9 需 REX.R=4C）
+            if regIdx == 1 { e8(72); e8(137); e8(149) }
+            elif regIdx == 2 { e8(76); e8(137); e8(133) }
+            else { e8(76); e8(137); e8(141) }
+            e32(d)
+            regIdx = regIdx + 1
+            li = li + 1
+        }
+    }
+
+    def parseFunc {
+        tAdvance()                       # def
+        name: Str = pt(0)
+        tAdvance()
+        localCount = 0
+        localStackTop = 0
+        np: Int = parseParamsOpt()
+        retTy: Str = "Int"
+        if tIsPunc("->") {
+            tAdvance()
+            retTy = pt(0)
+            tAdvance()
+            if retTy == "ActorRef" {
+                tExpect("[")
+                tAdvance()
+                tExpect("]")
+            } elif tIsPunc("[") {
+                tAdvance()
+                tAdvance()
+                tExpect("]")
+            }
+        }
+        curRetTy = retTy
+        # 登记函数：预扫已登记则补 fnPos，否则新登记
+        fi0: Int = findFn(name)
+        if fi0 >= 0 {
+            fnPos[fi0] = cw
+        } else {
+            fnName[fnCount] = name
+            fnNParam[fnCount] = np
+            fnRetTy[fnCount] = retTy
+            fnPos[fnCount] = cw
+            fnCount = fnCount + 1
+        }
+        # 序言：push rbp; mov rbp, rsp; sub rsp, imm32; push rbx; mov rbx, rcx
+        e8(85)
+        e8(72); e8(137); e8(229)
+        e8(72); e8(129); e8(236)
+        curSubSite = cw                   # 记录 imm32 位点，parseBlock 后按实际帧回填
+        e32(4104)
+        e8(83)                            # push rbx
+        e8(72); e8(137); e8(203)          # mov rbx, rcx（self）
+        emitLoadArgs(np)               # 参数 rdx/r8/r9 → 局部槽
+        parseBlock()
+        # 隐式 return：rax 归零（void 函数）+ 尾声
+        e8(72); e8(199); e8(192); e32(0)  # mov rax, 0
+        patchFrameSize()
+        emitEpilogue()
+        # 注意：fnCount 已在上面登记处递增，此处不可再递增（否则 fnCount 翻倍，
+        # 后半张函数表全是 NULL 名字，findFn/resolveFnFx 会读到空指针）
+    }
+
+    # 查找：返回索引，-1 = 未命中
+    def findLocal[name: Str] -> Int {
+        i: Int = 0
+        while i < localCount {
+            if localName[i] == name { return i }
+            i = i + 1
+        }
+        return -1
+    }
+    def findField[name: Str] -> Int {
+        i: Int = 0
+        while i < fldCount {
+            if fldName[i] == name { return i }
+            i = i + 1
+        }
+        return -1
+    }
+    def findFn[name: Str] -> Int {
+        i: Int = 0
+        while i < fnCount {
+            if fnName[i] == name { return i }
+            i = i + 1
+        }
+        return -1
+    }
+
+    # 分配/复用局部槽：同名复用，否则新槽（栈向负增长，数组占 N*8）
+    def localSlot[name: Str, ty: Str, arrN: Int] -> Int {
+        i: Int = 0
+        while i < localCount {
+            if localName[i] == name { return localDisp[i] }
+            i = i + 1
+        }
+        sz: Int = 8
+        if arrN > 0 { sz = 8 * arrN }
+        localStackTop = localStackTop - sz
+        d: Int = localStackTop
+        # 8 字节对齐
+        d = (d / 8) * 8
+        localName[localCount] = name
+        localDisp[localCount] = d
+        localTy[localCount] = ty
+        localArrN[localCount] = arrN
+        localCount = localCount + 1
+        return d
+    }
+
+    def parseParamsOpt -> Int {
+        n: Int = 0
+        if tIsPunc("[") {
+            tAdvance()
+            tSkipNl()
+            if tIsPunc("]") == False {
+                while True {
+                    pname: Str = pt(0)
+                    tAdvance()
+                    tExpect(":")
+                    pty: Str = pt(0)
+                    tAdvance()
+                    pArrN: Int = 0
+                    if pty == "ActorRef" {
+                        tExpect("[")
+                        tAdvance()
+                        tExpect("]")
+                    } elif tIsPunc("[") {
+                        tAdvance()
+                        pArrN = strToInt(pt(0))
+                        tAdvance()
+                        tExpect("]")
+                    }
+                    localSlot(pname, pty, pArrN)
+                    n = n + 1
+                    if tIsPunc(",") {
+                        tAdvance()
+                        tSkipNl()
+                    } else {
+                        break
+                    }
+                }
+            }
+            tSkipNl()
+            tExpect("]")
+        }
+        return n
+    }
+
+    def parseType {
+        t: Str = pt(0)
+        tAdvance()
+        if t == "ActorRef" {
+            tExpect("[")
+            tAdvance()
+            tExpect("]")
+            return
+        }
+        if tIsPunc("[") {
+            tAdvance()
+            tExpect(K_INT_TEXT())
+            tAdvance()
+            tExpect("]")
+        }
+    }
+
+    def K_INT_TEXT -> Str { return "int" }
+
+    def parseBlock {
+        tExpect("{")
+        tSkipNl()
+        while tIsPunc("}") == False {
+            if pk(0) == K_EOF { break }
+            parseStmt()
+            tSkipNl()
+        }
+        tExpect("}")
+    }
+
+    def parseStmt {
+        if tIsKw("var") or tIsKw("let") {
+            tAdvance()
+            parseDeclOrAssign()
+            return
+        }
+        if tIsKw("if") { parseIf(); return }
+        if tIsKw("while") {
+            tAdvance()
+            top: Int = newLb()
+            end: Int = newLb()
+            loopStack[loopDepth * 2] = end
+            loopStack[loopDepth * 2 + 1] = top
+            loopDepth = loopDepth + 1
+            eMark(top)
+            parseExpr()
+            testRaxBool()
+            eJccFwd(4, end)             # je
+            parseBlock()
+            eJmpFwd(top)
+            eMark(end)
+            loopDepth = loopDepth - 1
+            return
+        }
+        if tIsKw("for") {
+            tAdvance()
+            vname: Str = pt(0)
+            tAdvance()
+            tExpect("in")
+            parseExpr()                        # 起点 a → rax
+            d: Int = localSlot(vname, "Int", 0)
+            e8(72); e8(137); e8(133)           # mov [rbp+d], rax（先存 a，防被 b 覆盖）
+            e32(d)
+            incl: Int = 0
+            if tIsPunc("..=") { tAdvance(); incl = 1 } elif tIsPunc("..") { tAdvance() } else { err("for 区间") }
+            parseExpr()                        # 终点 b → rax
+            # 隐藏上限槽（名字唯一，防嵌套 for 复用同名槽）
+            lname: Str = strCat(".lim", intToStr(forSeq))
+            forSeq = forSeq + 1
+            dl: Int = localSlot(lname, "Int", 0)
+            e8(72); e8(137); e8(133)           # mov [rbp+dl], rax
+            e32(dl)
+            top: Int = newLb()
+            end: Int = newLb()
+            loopStack[loopDepth * 2] = end
+            loopStack[loopDepth * 2 + 1] = top
+            loopDepth = loopDepth + 1
+            eMark(top)
+            # i 与上限比较：..  时 i > b 结束；..= 时 i >= b 结束
+            # （复用与 while 一致的已验证路径：reg 比较 + setcc + test + jne）
+            e8(72); e8(139); e8(133)           # mov rax, [rbp+d]
+            e32(d)
+            e8(72); e8(139); e8(141)           # mov rcx, [rbp+dl]（48 8B 8D）
+            e32(dl)
+            if incl == 1 {
+                applyBinOp(">")
+            } else {
+                applyBinOp(">=")
+            }
+            e8(72); e8(133); e8(192)           # test rax, rax
+            eJccFwd(5, end)                    # jne end
+            parseBlock()
+            # i = i + 1
+            e8(72); e8(139); e8(133)           # mov rax, [rbp+d]
+            e32(d)
+            e8(72); e8(131); e8(192); e8(1)    # add rax, 1
+            e8(72); e8(137); e8(133)           # mov [rbp+d], rax
+            e32(d)
+            eJmpFwd(top)
+            eMark(end)
+            loopDepth = loopDepth - 1
+            return
+        }
+        if tIsKw("return") {
+            tAdvance()
+            if tIsPunc(";") == False and pk(0) != K_NL and tIsPunc("}") == False and pk(0) != K_EOF {
+                parseExpr()
+            } else {
+                e8(72); e8(199); e8(192); e32(0)   # mov rax, 0
+            }
+            endStmt()
+            emitEpilogue()
+            return
+        }
+        if tIsKw("break") {
+            tAdvance()
+            endStmt()
+            if loopDepth > 0 { eJmpFwd(loopStack[loopDepth * 2 - 2]) }
+            return
+        }
+        if tIsKw("continue") {
+            tAdvance()
+            endStmt()
+            if loopDepth > 0 { eJmpFwd(loopStack[loopDepth * 2 - 1]) }
+            return
+        }
+        parseDeclOrAssign()
+    }
+
+    def testRaxBool {
+        e8(72); e8(133); e8(192)       # test rax, rax
+    }
+
+    def parseIf {
+        tAdvance()
+        top: Int = newLb()
+        end: Int = newLb()
+        elseL: Int = newLb()
+        parseExpr()
+        testRaxBool()
+        eJccFwd(4, elseL)               # je → else
+        parseBlock()
+        eJmpFwd(end)
+        eMark(elseL)
+        save: Int = pi
+        tSkipNl()
+        if tIsKw("elif") {
+            # 注意：此处不可再 tAdvance()——递归 parseIf 入口的 tAdvance()
+            # 统一吃掉 "elif" 关键字。历史 bug：这里多吃一次导致条件首 token
+            # （如 tIsPunc）被吞，条件退化为 "( 实参 )" 括号表达式（恒真/恒假），
+            # 是自举第 2 步 wkcc2 损坏的根因。
+            parseIf()
+        } elif tIsKw("else") {
+            tAdvance()
+            if tIsKw("if") {
+                parseIf()
+            } else {
+                parseBlock()
+            }
+        } else {
+            pi = save
+        }
+        eMark(end)
+    }
+
+    def parseDeclOrAssign {
+        # ---- 声明：name: Ty [= expr] ----
+        if pk(0) == K_IDENT and pk(1) == K_PUNC and pt(1) == ":" {
+            name: Str = pt(0)
+            tAdvance()
+            tAdvance()
+            ty: Str = pt(0)
+            tAdvance()
+            arrN: Int = 0
+            if ty == "ActorRef" {
+                tExpect("[")
+                tAdvance()
+                tExpect("]")
+            } elif tIsPunc("[") {
+                tAdvance()
+                arrN = strToInt(pt(0))
+                tAdvance()
+                tExpect("]")
+            }
+            hasV: Int = 0
+            if tIsPunc("=") {
+                tAdvance()
+                hasV = 1
+                parseExpr()
+            } elif arrN == 0 {
+                e8(72); e8(199); e8(192); e32(0)   # mov rax, 0（无初值标量置零）
+            }
+            d: Int = localSlot(name, ty, arrN)
+            if arrN == 0 {
+                e8(72); e8(137); e8(133)           # mov [rbp+d32], rax
+                e32(d)
+            } elif hasV == 1 {
+                err("局部数组暂不支持初始化")
+            }
+            endStmt()
+            return
+        }
+        # ---- 赋值 / 表达式语句 ----
+        if pk(0) == K_IDENT and pk(1) == K_PUNC and (pt(1) == "=" or pt(1) == "[") {
+            name: Str = pt(0)
+            tAdvance()
+            isIdx: Int = 0
+            if tIsPunc("[") {
+                tAdvance()
+                savedB: Int = lastArrBase
+                lastArrBase = -1
+                parseExpr()                        # index → rax
+                lastArrBase = savedB
+                e8(80)                             # push rax（保护 index）
+                tExpect("]")
+                isIdx = 1
+            }
+            tExpect("=")
+            parseExpr()                            # RHS → rax
+            e8(72); e8(139); e8(200)               # mov rcx, rax
+            li: Int = findLocal(name)
+            if li >= 0 {
+                if isIdx == 1 {
+                    if localArrN[li] == 0 { err(strCat("下标作用于标量 ", name)) }
+                    e8(88)                         # pop rax（index）
+                    eBounds(localArrN[li])
+                    e8(72); e8(137); e8(140)       # mov [rbp+rax*8+d32], rcx → 48 89 8C C5
+                    e8(197)
+                    e32(localDisp[li])
+                } else {
+                    e8(72); e8(137); e8(141)       # mov [rbp+d32], rcx → 48 89 8D
+                    e32(localDisp[li])
+                }
+                endStmt()
+                return
+            }
+            fi2: Int = findField(name)
+            if fi2 >= 0 {
+                if isIdx == 1 {
+                    if fldArrN[fi2] == 0 { err(strCat("下标作用于标量字段 ", name)) }
+                    e8(88)                         # pop rax
+                    eBounds(fldArrN[fi2])
+                    e8(72); e8(137); e8(140)       # mov [rbx+rax*8+off32], rcx → 48 89 8C C3
+                    e8(195)
+                    e32(fldOff[fi2])
+                } else {
+                    e8(72); e8(137); e8(139)       # mov [rbx+off32], rcx → 48 89 8B
+                    e32(fldOff[fi2])
+                }
+                endStmt()
+                return
+            }
+            err(strCat("赋值目标未定义 ", name))
+            return
+        }
+        parseExpr()
+        endStmt()
+    }
+
+    # 下标边界检查：cmp rax, n; jae → rt_bounds_fail
+    def eBounds[n: Int] {
+        e8(72); e8(129); e8(248)               # cmp rax, imm32 → 48 81 F8
+        e32(n)
+        e8(15); e8(131)                        # jae（0F 83）
+        fxSite[fxCount] = cw
+        fxLabel[fxCount] = -2 - 1              # 特殊标记（负数），resolveFx 特判
+        fxCount = fxCount + 1
+        e32(0)
+    }
+
+    # ================= 表达式求值（结果在 RAX） =================
+    def parseExpr { parseBinLvl(0) }
+
+    def isBinOpHere[level: Int] -> Bool {
+        t: Str = pt(0)
+        if level == 0 { return t == "or" or t == "||" }
+        if level == 1 { return t == "and" or t == "&&" }
+        if level == 2 { return t == "==" or t == "!=" }
+        if level == 3 { return t == "<" or t == "<=" or t == ">" or t == ">=" }
+        if level == 4 { return t == "+" or t == "-" }
+        if level == 5 { return t == "*" or t == "/" or t == "%" }
+        return False
+    }
+
+    def parseBinLvl[level: Int] {
+        if level >= 6 { parseUnary(); return }
+        parseBinLvl(level + 1)
+        while isBinOpHere(level) {
+            op: Str = pt(0)
+            tAdvance()
+            e8(80)                         # push rax（保护左值）
+            parseBinLvl(level + 1)
+            e8(72); e8(139); e8(200)       # mov rcx, rax（右值 → rcx）
+            e8(88)                         # pop rax（恢复左值）
+            applyBinOp(op)
+        }
+    }
+
+    def applyBinOp[op: Str] {
+        # 约定：RAX = 左值，RCX = 右值 → 结果在 RAX
+        if op == "+" { e8(72); e8(1); e8(200); lastTy = "Int"; return }          # add rax, rcx
+        if op == "-" { e8(72); e8(41); e8(200); lastTy = "Int"; return }         # sub rax, rcx
+        if op == "*" { e8(72); e8(15); e8(175); e8(193); lastTy = "Int"; return } # imul rax, rcx（48 0F AF C1：IMUL 目标在 reg 字段）
+        if op == "/" {
+            e8(72); e8(153)                    # cqo（48 99）
+            e8(72); e8(247); e8(249)           # idiv rcx（48 F7 F9）
+            lastTy = "Int"
+            return
+        }
+        if op == "%" {
+            e8(72); e8(153)                    # cqo
+            e8(72); e8(247); e8(249)           # idiv rcx
+            e8(72); e8(137); e8(208)           # mov rax, rdx（48 89 D0）
+            lastTy = "Int"
+            return
+        }
+        if op == "and" { e8(72); e8(33); e8(200); lastTy = "Int"; return }       # and rax, rcx
+        if op == "or" { e8(72); e8(9); e8(200); lastTy = "Int"; return }         # or rax, rcx
+        if op == "==" or op == "!=" {
+            if lastTy == "Str" {
+                # str_eq(rcx=左, rdx=右)：当前 rax=左, rcx=右
+                e8(72); e8(137); e8(202)       # mov rdx, rcx（48 89 CA）
+                e8(72); e8(137); e8(193)       # mov rcx, rax（48 89 C1）
+                eCallRt(OFF_STR_EQ)
+            } else {
+                e8(72); e8(57); e8(200)        # cmp rax, rcx（48 39 C8）
+                if op == "==" {
+                    e8(15); e8(148)            # sete al
+                } else {
+                    e8(15); e8(149)            # setne al
+                }
+                e8(192)
+                e8(15); e8(182); e8(192)       # movzx eax, al
+            }
+            lastTy = "Int"
+            return
+        }
+        if op == "<" or op == "<=" or op == ">" or op == ">=" {
+            e8(72); e8(57); e8(200)            # cmp rax, rcx（有符号）
+            if op == "<" { e8(15); e8(156) }       # setl  0F 9C
+            elif op == "<=" { e8(15); e8(158) }    # setle 0F 9E
+            elif op == ">" { e8(15); e8(159) }     # setg  0F 9F
+            else { e8(15); e8(157) }               # setge 0F 9D
+            e8(192)
+            e8(15); e8(182); e8(192)           # movzx eax, al
+            lastTy = "Int"
+            return
+        }
+        err(strCat("未实现运算符 ", op))
+    }
+
+    def parseUnary {
+        if tIsPunc("(") {
+            tAdvance()
+            parseExpr()
+            tExpect(")")
+            return
+        }
+        if tIsPunc("-") { tAdvance(); parseUnary(); e8(72); e8(247); e8(216); return }  # neg rax
+        if tIsPunc("!") or tIsKw("not") {
+            tAdvance()
+            parseUnary()
+            e8(72); e8(133); e8(192)       # test rax, rax
+            e8(15); e8(148); e8(192)       # sete al
+            e8(15); e8(182); e8(192)       # movzx eax, al
+            return
+        }
+        parsePostfix()
+    }
+
+    # 调用装参：实参已在栈上（求值顺序 push，栈顶=最后参数）
+    # hasSelf=0：内置 → rcx=参1, rdx=参2, r8=参3
+    # hasSelf=1：def → rcx=self(rbx)，rdx=参1, r8=参2, r9=参3
+    def ePopArgs[nargs: Int, hasSelf: Int] {
+        if hasSelf == 0 {
+            if nargs == 1 { e8(89) }                       # pop rcx
+            elif nargs == 2 { e8(90); e8(89) }             # pop rdx; pop rcx
+            elif nargs == 3 { e8(65); e8(88); e8(90); e8(89) }  # pop r8(41 58); pop rdx; pop rcx
+        } else {
+            if nargs == 1 { e8(90) }                       # pop rdx
+            elif nargs == 2 { e8(65); e8(88); e8(90) }     # pop r8(41 58); pop rdx
+            elif nargs == 3 { e8(65); e8(89); e8(65); e8(88); e8(90) }  # pop r9(41 59); pop r8; pop rdx
+        }
+    }
+
+    def parsePostfix {
+        parsePrimary()
+        while True {
+            if tIsPunc("[") {
+                if lastArrBase < 0 { err("下标作用于非数组") }
+                tAdvance()
+                # index 求值期间屏蔽外层数组延迟状态（防内层 parsePostfix 误发基址 lea）
+                savedBase: Int = lastArrBase
+                lastArrBase = -1
+                parseExpr()                        # index → rax
+                lastArrBase = savedBase
+                tExpect("]")
+                eBounds(lastArrN)
+                if lastArrBase == 1 {
+                    e8(72); e8(139); e8(132)       # mov rax, [rbx+rax*8+off32]（48 8B 84 C3）
+                    e8(195)
+                } else {
+                    e8(72); e8(139); e8(132)       # mov rax, [rbp+rax*8+d32]（48 8B 84 C5）
+                    e8(197)
+                }
+                e32(lastArrOff)
+                lastTy = lastArrTy
+                lastArrBase = -1
+                continue
+            }
+            if tIsPunc(".") {
+                tAdvance()
+                name: Str = pt(0)
+                tAdvance()
+                tExpect("(")
+                msg: Str = pt(0)
+                tAdvance()
+                tExpect("(")
+                if tIsPunc(")") == False {
+                    while True {
+                        parseExpr()
+                        if tIsPunc(",") { tAdvance() } else { break }
+                    }
+                }
+                tExpect(")")
+                tExpect(")")
+                continue
+            }
+            break
+        }
+        if lastArrBase >= 0 {
+            # 数组名裸用 = 基址（传引用语义）
+            if lastArrBase == 1 {
+                e8(72); e8(141); e8(131)           # lea rax, [rbx+off32]（48 8D 83）
+            } else {
+                e8(72); e8(141); e8(133)           # lea rax, [rbp+d32]（48 8D 85）
+            }
+            e32(lastArrOff)
+            lastTy = "Ptr"
+            lastArrBase = -1
+        }
+    }
+
+    def addStr[s: Str] -> Int {
+        n: Int = strLen(s)
+        off: Int = rw
+        i: Int = 0
+        while i < n {
+            store8(ptrAdd(rbuf, rw), load8(ptrAdd(strPtr(s), i)))
+            rw = rw + 1
+            i = i + 1
+        }
+        store8(ptrAdd(rbuf, rw), 0)
+        rw = rw + 1
+        return RDATA_RVA + rdataStrBase + off
+    }
+
+    def parsePrimary {
+        k: Int = pk(0)
+        if k == K_INT {
+            txt: Str = pt(0)
+            tAdvance()
+            v: Int = strToInt(txt)
+            # imm32 可表示（-2^31..2^31-1）→ mov rax, imm32（符号扩展 64 位）
+            # 否则 → movabs rax, imm64（48 B8 + 8 字节 LE）。
+            # 历史 bug：2^32（如 put64 的 4294967296）经 imm32 截断为 0，
+            # 生成 idiv rcx(=0) → 0xC0000094 除零崩溃。
+            # 注意：字节提取只用 ≤256 的常量，避免本修复在自举时自己踩中截断。
+            if v <= 2147483647 {
+                e8(72); e8(199); e8(192); e32(v)   # mov rax, imm32
+            } else {
+                e8(72); e8(184)                    # movabs rax, imm64（48 B8）
+                b0: Int = v % 256
+                r1: Int = v / 256
+                e8(b0 % 256)
+                e8(r1 % 256)
+                r2: Int = r1 / 256
+                e8(r2 % 256)
+                r3: Int = r2 / 256
+                e8(r3 % 256)
+                r4: Int = r3 / 256
+                e8(r4 % 256)
+                r5: Int = r4 / 256
+                e8(r5 % 256)
+                r6: Int = r5 / 256
+                e8(r6 % 256)
+                e8(r6 / 256)
+            }
+            lastTy = "Int"
+            return
+        }
+        if k == K_STR {
+            txt: Str = pt(0)
+            tAdvance()
+            rva: Int = addStr(txt)
+            eLeaRcv(0, rva)                # lea rax, [rip+disp]
+            lastTy = "Str"
+            return
+        }
+        if k == K_KW {
+            if tIs("true") or tIs("True") {
+                tAdvance()
+                e8(72); e8(199); e8(192); e32(1)   # mov rax, 1
+                lastTy = "Int"
+                return
+            }
+            if tIs("false") or tIs("False") {
+                tAdvance()
+                e8(72); e8(199); e8(192); e32(0)   # mov rax, 0
+                lastTy = "Int"
+                return
+            }
+            if tIs("self") {
+                tAdvance()
+                e8(72); e8(137); e8(216)   # mov rax, rbx（rbx = handler 序言保存的 self）
+                lastTy = "Ptr"
+                return
+            }
+            if tIs("spawn") {
+                tAdvance()
+                aname: Str = pt(0)
+                tAdvance()
+                # 查找目标 actor
+                ai: Int = 0
+                while ai < actCount {
+                    if actName[ai] == aname {
+                        e8(72); e8(141); e8(13)
+                        e32(USER_RVA + actDisp[ai] - (USER_RVA + cw + 4))
+                        e8(72); e8(199); e8(194); e32(actSize[ai])
+                        eCallRt(OFF_ACTOR_NEW)
+                    }
+                    ai = ai + 1
+                }
+                lastTy = "Ptr"
+                return
+            }
+            err("表达式里出现意外的关键字")
+            return
+        }
+        if k == K_IDENT {
+            name: Str = pt(0)
+            tAdvance()
+            if tIsPunc("(") {
+                tAdvance()
+                if name == "print" {
+                    eCallRt(OFF_PBEGIN)
+                    if tIsPunc(")") == False {
+                        while True {
+                            if pk(0) == K_STR {
+                                stxt: Str = pt(0)
+                                tAdvance()
+                                srva: Int = addStr(stxt)
+                                eLeaRcv(0, srva)
+                                e8(72); e8(137); e8(193)   # mov rcx, rax（48 89 C1）
+                                eCallRt(OFF_PCSTR)
+                            } else {
+                                parseExpr()
+                                e8(72); e8(137); e8(193)   # mov rcx, rax（48 89 C1）
+                                if lastTy == "Str" {
+                                    eCallRt(OFF_PCSTR)
+                                } else {
+                                    eCallRt(OFF_PRINT_INT)
+                                }
+                            }
+                            if tIsPunc(",") { tAdvance() } else { break }
+                        }
+                    }
+                    tExpect(")")
+                    eCallRt(OFF_PRINT_END)
+                    lastTy = "Int"
+                    return
+                }
+                # ---- 通用调用：实参求值压栈 ----
+                nargs: Int = 0
+                if tIsPunc(")") == False {
+                    while True {
+                        parseExpr()
+                        e8(80)                     # push rax
+                        nargs = nargs + 1
+                        if tIsPunc(",") { tAdvance() } else { break }
+                    }
+                }
+                tExpect(")")
+                # ---- 内置函数：rcx/rdx/r8 = 参数1/2/3 ----
+                if name == "strLen" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_STR_LEN); lastTy = "Int"; return
+                }
+                if name == "strCat" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_STR_CAT); lastTy = "Str"; return
+                }
+                if name == "intToStr" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_INT_TO_STR); lastTy = "Str"; return
+                }
+                if name == "strToInt" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_STR_TO_INT); lastTy = "Int"; return
+                }
+                if name == "strEq" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_STR_EQ); lastTy = "Int"; return
+                }
+                if name == "alloc" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_ALLOC); lastTy = "Ptr"; return
+                }
+                if name == "copyBytes" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_COPY); lastTy = "Int"; return
+                }
+                if name == "readBytes" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_READ_BYTES); lastTy = "Int"; return
+                }
+                if name == "writeBytes" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_WRITE_BYTES); lastTy = "Int"; return
+                }
+                if name == "nowMs" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_NOW_MS); lastTy = "Int"; return
+                }
+                if name == "ptrAdd" {
+                    # ptrAdd(p, i) = p + i：rcx=p, rdx=i → mov rax,rcx; add rax,rdx
+                    ePopArgs(nargs, 0)
+                    e8(72); e8(137); e8(200)   # mov rax, rcx（48 89 C8）
+                    e8(72); e8(1); e8(208)     # add rax, rdx（48 01 D0）
+                    lastTy = "Ptr"; return
+                }
+                if name == "load8" {
+                    # load8(p)：movzx rax, byte [rcx]
+                    ePopArgs(nargs, 0)
+                    e8(72); e8(15); e8(182); e8(1)   # movzx rax, byte [rcx]（48 0F B6 01）
+                    lastTy = "Int"; return
+                }
+                if name == "store8" {
+                    # store8(p, v)：mov byte [rcx], dl
+                    ePopArgs(nargs, 0)
+                    e8(136); e8(17)            # mov byte [rcx], dl（88 11）
+                    lastTy = "Int"; return
+                }
+                if name == "strPtr" or name == "ptrToStr" {
+                    # Str 与 Ptr 同为指针，恒等
+                    ePopArgs(nargs, 0)
+                    e8(72); e8(137); e8(200)   # mov rax, rcx（48 89 C8）
+                    lastTy = "Ptr"; return
+                }
+                # ---- def 方法：rcx=self(rbx)，rdx/r8/r9 = 参数1/2/3 ----
+                fi: Int = findFn(name)
+                if fi >= 0 and fnPos[fi] >= 0 {
+                    # 已定义，正常调用
+                    ePopArgs(nargs, 1)
+                    e8(72); e8(137); e8(217)   # mov rcx, rbx（48 89 D9）
+                    eCallUser(fnPos[fi])
+                    lastTy = fnRetTy[fi]
+                    return
+                }
+                # 前向引用：装参照常，E8 rel32 占位由 resolveFnFx 回填
+                ePopArgs(nargs, 1)
+                e8(72); e8(137); e8(217)   # mov rcx, rbx（48 89 D9）
+                e8(232)
+                ufSite[ufCount] = cw       # cw 已过 E8，指向 rel32 位置
+                ufName[ufCount] = name
+                ufCount = ufCount + 1
+                e32(0)
+                if fi >= 0 {
+                    lastTy = fnRetTy[fi]   # 预扫已提供返回类型
+                } else {
+                    lastTy = "Int"
+                }
+                return
+            }
+            # ---- 裸标识符：局部变量 / 字段 / 数组基址 ----
+            li: Int = findLocal(name)
+            if li >= 0 {
+                if localArrN[li] > 0 {
+                    lastArrBase = 2
+                    lastArrOff = localDisp[li]
+                    lastArrN = localArrN[li]
+                    lastArrTy = localTy[li]
+                } else {
+                    e8(72); e8(139); e8(133)       # mov rax, [rbp+d32]（48 8B 85）
+                    e32(localDisp[li])
+                    lastTy = localTy[li]
+                }
+                return
+            }
+            fi3: Int = findField(name)
+            if fi3 >= 0 {
+                if fldArrN[fi3] > 0 {
+                    lastArrBase = 1
+                    lastArrOff = fldOff[fi3]
+                    lastArrN = fldArrN[fi3]
+                    lastArrTy = fldTy[fi3]
+                } else {
+                    e8(72); e8(139); e8(131)       # mov rax, [rbx+off32]（48 8B 83）
+                    e32(fldOff[fi3])
+                    lastTy = fldTy[fi3]
+                }
+                return
+            }
+            err(strCat("未定义的标识符 ", name))
+            return
+        }
+                    }
+    def buildPe {
+        setupNames()
+        # ---- 1) 读运行时 blob ----
+        blob = alloc(RT_DATA_OFF + RT_DATA_LEN + 16)
+        got: Int = readBytes("build/rt_blob.bin", blob, RT_DATA_OFF + RT_DATA_LEN)
+
+        # ---- 2) 布局计算 ----
+        # .text = blob text (3086) + 填充到 4096 + 用户代码 (cw)
+        textUsed: Int = USER_OFF + cw
+        textRaw: Int = ((textUsed + 511) / 512) * 512
+        # .rdata = blob rdata (482) + 导入表结构 + 字符串区 (rw)
+        strArea: Int = rw
+        impSize = 40 + 8 * (NIMPORT + 1) + 13
+        ii: Int = 0
+        while ii < NIMPORT {
+            impSize = impSize + 2 + strLen(inames[ii]) + 1
+            ii = ii + 1
+        }
+        rdataUsed: Int = RT_RDATA_LEN + impSize + strArea
+        rdataRaw: Int = ((rdataUsed + 511) / 512) * 512
+        # .data = blob data
+        dataRaw: Int = ((RT_DATA_LEN + 511) / 512) * 512
+        fileSize: Int = 512 + textRaw + rdataRaw + dataRaw
+        # RVA 固定布局
+        # .text RVA = 0x1000, .rdata RVA = 0x11000, .data RVA = 0x21000
+        # IAT RVA = 0x21000 + 17152 = 0x25300
+        # image size = 0x21000 + align(dataRaw, 0x1000) = 0x21000 + 0x5000 = 0x26000
+
+        # ---- 3) 分配输出缓冲 ----
+        out = alloc(fileSize + 16)
+        w = 0
+
+        # ---- 4) DOS 头 ----
+        put8(77); put8(90)                    # MZ
+        putZeros(58)
+        put32(64)                             # e_lfanew
+
+        # ---- 5) PE 签名 + COFF ----
+        putStr("PE"); put8(0); put8(0)
+        put16(34404)                          # machine = x64
+        put16(3)                              # num sections
+        put32(0)                              # timestamp
+        put32(0); put32(0)                    # symbol ptr/count
+        put16(240)                            # opt header size
+        put16(34)                             # characteristics
+
+        # ---- 6) 可选头 (PE32+, 240 字节) ----
+        put16(523)                            # magic PE32+
+        put8(14); put8(0)                     # linker version
+        put32(textRaw)                        # SizeOfCode
+        put32(rdataRaw + dataRaw)             # SizeOfInitializedData
+        put32(0)                              # SizeOfUninitializedData
+        put32(TEXT_RVA + USER_OFF + entryPos)  # AddressOfEntryPoint（指向 entry 代码，不是用户代码开头）
+        put32(TEXT_RVA)                       # BaseOfCode
+        put64(5368709120)                     # ImageBase = 0x140000000
+        put32(4096)                           # SectionAlignment
+        put32(512)                            # FileAlignment
+        put16(6); put16(0)                    # OS version
+        put16(0); put16(0)                    # Image version
+        put16(6); put16(0)                    # Subsystem version
+        put32(0)                              # Win32 version
+        # SizeOfImage = DATA_RVA + dataRaw 对齐到 4096
+        soi: Int = DATA_RVA + ((dataRaw + 4095) / 4096) * 4096
+        put32(soi)
+        put32(512)                            # SizeOfHeaders
+        put32(0)                              # CheckSum
+        put16(3)                              # Subsystem = console
+        put16(0)                              # DllCharacteristics
+        put64(1048576); put64(4096)           # Stack
+        put64(1048576); put64(4096)           # Heap
+        put32(0)                              # LoaderFlags
+        put32(16)                             # NumberOfRvaAndSizes
+        # 数据目录 16 项
+        put32(0); put32(0)                    # [0] Export
+        put32(RDATA_RVA + RT_RDATA_LEN)       # [1] Import RVA
+        put32(40)                             # Import size
+        putZeros(80)                          # [2..11] 10 项
+        put32(DATA_RVA + IAT_IN_DATA)         # [12] IAT RVA
+        put32(8 * (NIMPORT + 1))              # IAT size
+        putZeros(24)                          # [13..15] 3 项
+
+        # ---- 7) 段表（3 个段头，名字补满 8 字节）----
+        # VirtualSize 必须铺满到下一个段的 RVA（Win11 内核拒绝段间有未映射空洞的映像）
+        # RawSize 保持真实文件大小，段内超出部分加载器自动补零
+        putStr(".text"); putZeros(3)
+        put32(RDATA_RVA - TEXT_RVA); put32(TEXT_RVA); put32(textRaw); put32(512)
+        put32(0); put32(0); put16(0); put16(0); put32(1610612768)
+        putStr(".rdata"); putZeros(2)
+        put32(DATA_RVA - RDATA_RVA); put32(RDATA_RVA); put32(rdataRaw); put32(512 + textRaw)
+        put32(0); put32(0); put16(0); put16(0); put32(1073741888)
+        putStr(".data"); putZeros(3)
+        put32(soi - DATA_RVA); put32(DATA_RVA); put32(dataRaw); put32(512 + textRaw + rdataRaw)
+        put32(0); put32(0); put16(0); put16(0); put32(3221225536)
+        putZeros(512 - w)                     # 头部填充到 512
+
+        # ---- 8) .text 段：blob text + 用户代码 ----
+        w = 512
+        putBlob(0, RT_TEXT_LEN)               # blob text
+        putZeros(USER_OFF - RT_TEXT_LEN)      # 填充到 4096
+        # 拷贝用户代码
+        copyBytes(ptrAdd(out, 512 + USER_OFF), cbuf, cw)
+        w = 512 + textRaw
+        putZeros(0)                           # w 已在正确位置
+
+        # ---- 9) .rdata 段：blob rdata + 导入表 + 字符串 ----
+        w = 512 + textRaw
+        putBlob(RT_TEXT_LEN, RT_RDATA_LEN)    # blob rdata
+        impBase: Int = RT_RDATA_LEN
+        iltRVA: Int = RDATA_RVA + impBase + 40
+        dllRVA: Int = iltRVA + 8 * (NIMPORT + 1)
+        # 描述符
+        put32(iltRVA); put32(0); put32(0); put32(dllRVA); put32(DATA_RVA + IAT_IN_DATA)
+        # ILT 起始：描述符 20B + 20B 空隙（iltRVA 指向 impBase+40）
+        w = 512 + textRaw + impBase + 40
+        # ILT（8 字节步长）
+        j: Int = 0
+        while j < NIMPORT + 1 {
+            if j < NIMPORT {
+                hint: Int = dllRVA + 13
+                k2: Int = 0
+                while k2 < j {
+                    hint = hint + 2 + strLen(inames[k2]) + 1
+                    k2 = k2 + 1
+                }
+                put32at(w + 8 * j, hint)
+                hintRVA[j] = hint
+            } else {
+                put32at(w + 8 * j, 0)
+            }
+            j = j + 1
+        }
+        w = 512 + textRaw + dllRVA - RDATA_RVA
+        putStr("kernel32.dll"); put8(0)
+        j = 0
+        while j < NIMPORT {
+            put16(0); putStr(inames[j]); put8(0)
+            j = j + 1
+        }
+        # 字符串区（从 rbuf 拷贝，w 当前正好在 rdataStrBase）
+        copyBytes(ptrAdd(out, w), rbuf, strArea)
+        w = w + strArea
+        putZeros(rdataRaw - rdataUsed)
+
+        # ---- 10) .data 段：blob data + IAT hint RVA ----
+        w = 512 + textRaw + rdataRaw
+        putBlob(RT_DATA_OFF, RT_DATA_LEN)
+        j = 0
+        while j < NIMPORT {
+            put32at(w - RT_DATA_LEN + IAT_IN_DATA + 8 * j, hintRVA[j])
+            j = j + 1
+        }
+        putZeros(dataRaw - RT_DATA_LEN)
+
+        # ---- 11) 写文件 ----
+        wrote: Int = writeBytes("build/selfhost.exe", out, fileSize)
+        print("selfhost.exe 写出 = ", wrote, " 字节")
+    }
+
+    # ---- PE 写出帮助函数 ----
+    def put8[b: Int] { store8(ptrAdd(out, w), b % 256); w = w + 1 }
+    def put16[v: Int] {
+        u: Int = v
+        if u < 0 { u = u + 65536 }
+        put8(u % 256); put8((u / 256) % 256)
+    }
+    def put32[v: Int] {
+        u: Int = v
+        if u < 0 { u = u + 4294967296 }
+        put8(u % 256); put8((u / 256) % 256); put8((u / 65536) % 256); put8((u / 16777216) % 256)
+    }
+    def put64[v: Int] {
+        lo: Int = v % 4294967296
+        hi: Int = (v - lo) / 4294967296
+        put32(lo); put32(hi)
+    }
+    def putStr[s: Str] {
+        n: Int = strLen(s)
+        i: Int = 0
+        while i < n { put8(load8(ptrAdd(strPtr(s), i))); i = i + 1 }
+    }
+    def putZeros[n: Int] { i: Int = 0; while i < n { put8(0); i = i + 1 } }
+    def put32at[at: Int, v: Int] {
+        u: Int = v
+        if u < 0 { u = u + 4294967296 }
+        store8(ptrAdd(out, at), u % 256)
+        store8(ptrAdd(out, at + 1), (u / 256) % 256)
+        store8(ptrAdd(out, at + 2), (u / 65536) % 256)
+        store8(ptrAdd(out, at + 3), (u / 16777216) % 256)
+    }
+    def putBlob[at: Int, len: Int] {
+        copyBytes(ptrAdd(out, w), ptrAdd(blob, at), len)
+        w = w + len
+    }
+
+    on Start {
+        main()
+    }
+}

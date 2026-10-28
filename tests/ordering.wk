@@ -1,0 +1,43 @@
+// 我自己写的用例 1：FIFO 顺序 + 不丢消息
+// Main 顺序发 10 万条带序号的消息，Verifier 逐条核对序号是否连续
+actor Verifier {
+    expect: Int = 0
+    got: Int = 0
+    bad: Int = 0
+    hub: ActorRef[Main]
+
+    on Setup[h: ActorRef[Main]] {
+        hub = h
+    }
+
+    on Tick[n: Int] {
+        got = got + 1
+        if n != expect {
+            bad = bad + 1
+        }
+        expect = n + 1
+    }
+
+    on Verify {
+        hub.send(Summary(got, bad, expect))
+    }
+}
+
+actor Main {
+    v: ActorRef[Verifier]
+
+    on Start {
+        v = spawn Verifier
+        v.send(Setup(self))
+        i: Int = 0
+        while i < 100000 {
+            v.send(Tick(i))
+            i = i + 1
+        }
+        v.send(Verify())
+    }
+
+    on Summary[got: Int, bad: Int, expect: Int] {
+        print("收到 ", got, " 条 | 序号错乱 ", bad, " 条 | 期望下一条 ", expect)
+    }
+}

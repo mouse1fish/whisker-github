@@ -1,0 +1,440 @@
+# Whisker 版词法器（自举第 6 步）
+# 读取 build\lex_input.txt，把 token 流打到标准输出，每行一行：kind|text
+# 与 Python 前端 lexer.py 的输出逐字对齐（比对由 tools\compare_lexer.py 完成）。
+actor Main {
+    # ---- 输入 ----
+    src: Ptr
+    limit: Int = 0
+    pos: Int = 0
+    depth: Int = 0
+
+    # ---- token 流 ----
+    tkKind: Int[32768]
+    tkText: Str[32768]
+    count: Int = 0
+
+    # ---- 关键字表 / 符号表 ----
+    kws: Str[32]
+    puns: Str[40]
+
+    K_INT: Int = 0
+    K_STR: Int = 1
+    K_IDENT: Int = 2
+    K_KW: Int = 3
+    K_PUNC: Int = 4
+    K_NL: Int = 5
+    K_EOF: Int = 6
+
+    def setup {
+        kws[0] = "actor"
+        kws[1] = "on"
+        kws[2] = "if"
+        kws[3] = "else"
+        kws[4] = "elif"
+        kws[5] = "while"
+        kws[6] = "for"
+        kws[7] = "in"
+        kws[8] = "spawn"
+        kws[9] = "self"
+        kws[10] = "return"
+        kws[11] = "break"
+        kws[12] = "continue"
+        kws[13] = "def"
+        kws[14] = "and"
+        kws[15] = "or"
+        kws[16] = "not"
+        kws[17] = "true"
+        kws[18] = "false"
+        kws[19] = "True"
+        kws[20] = "False"
+        kws[21] = "var"
+        kws[22] = "let"
+
+        puns[0] = "..="
+        puns[1] = ".."
+        puns[2] = "->"
+        puns[3] = "&&"
+        puns[4] = "||"
+        puns[5] = "=="
+        puns[6] = "!="
+        puns[7] = "<="
+        puns[8] = ">="
+        puns[9] = "("
+        puns[10] = ")"
+        puns[11] = "{"
+        puns[12] = "}"
+        puns[13] = "["
+        puns[14] = "]"
+        puns[15] = ","
+        puns[16] = ":"
+        puns[17] = ";"
+        puns[18] = "="
+        puns[19] = "<"
+        puns[20] = ">"
+        puns[21] = "+"
+        puns[22] = "-"
+        puns[23] = "*"
+        puns[24] = "/"
+        puns[25] = "%"
+        puns[26] = "!"
+        puns[27] = "."
+        puns[28] = "?"
+    }
+
+    def peek[o: Int] -> Int {
+        if pos + o >= limit {
+            return 0
+        }
+        return load8(ptrAdd(src, pos + o))
+    }
+
+    def advance[n: Int] {
+        pos = pos + n
+    }
+
+    def isDigit[c: Int] -> Bool {
+        return c >= 48 and c <= 57
+    }
+
+    def isHex[c: Int] -> Bool {
+        if isDigit(c) {
+            return True
+        }
+        return (c >= 97 and c <= 102) or (c >= 65 and c <= 70)
+    }
+
+    def isAlpha[c: Int] -> Bool {
+        if c == 95 {
+            return True
+        }
+        return (c >= 97 and c <= 122) or (c >= 65 and c <= 90)
+    }
+
+    def isAlnum[c: Int] -> Bool {
+        if isDigit(c) {
+            return True
+        }
+        return isAlpha(c)
+    }
+
+    def isSpace[c: Int] -> Bool {
+        return c == 32 or c == 9 or c == 13
+    }
+
+    def srcHas[s: Str] -> Bool {
+        i: Int = 0
+        while load8(ptrAdd(strPtr(s), i)) != 0 {
+            if pos + i >= limit {
+                return False
+            }
+            if load8(ptrAdd(src, pos + i)) != load8(ptrAdd(strPtr(s), i)) {
+                return False
+            }
+            i = i + 1
+        }
+        return True
+    }
+
+    def copyFromSrc[at: Int, len: Int] -> Str {
+        p: Ptr = alloc(len + 1)
+        i: Int = 0
+        while i < len {
+            store8(ptrAdd(p, i), load8(ptrAdd(src, at + i)))
+            i = i + 1
+        }
+        store8(ptrAdd(p, len), 0)
+        return ptrToStr(p)
+    }
+
+    def pushTok[k: Int, text: Str] {
+        tkKind[count] = k
+        tkText[count] = text
+        count = count + 1
+    }
+
+    def kindName[k: Int] -> Str {
+        if k == K_INT {
+            return "int"
+        }
+        if k == K_STR {
+            return "str"
+        }
+        if k == K_IDENT {
+            return "ident"
+        }
+        if k == K_KW {
+            return "kw"
+        }
+        if k == K_PUNC {
+            return "punc"
+        }
+        if k == K_NL {
+            return "newline"
+        }
+        return "eof"
+    }
+
+    def kwIndex[s: Str] -> Int {
+        i: Int = 0
+        while i < 23 {
+            if kws[i] == s {
+                return i
+            }
+            i = i + 1
+        }
+        return -1
+    }
+
+    def loadSrc[path: Str] -> Int {
+        cap: Int = 1048576
+        p: Ptr = alloc(cap + 1)
+        n: Int = readBytes(path, p, cap)
+        if n < 0 {
+            return -1
+        }
+        store8(ptrAdd(p, n), 0)
+        src = p
+        limit = n
+        pos = 0
+        return n
+    }
+
+    def lexNumber {
+        start: Int = pos
+        if peek(0) == 48 and (peek(1) == 120 or peek(1) == 88) {
+            # 十六进制：0x + [0-9a-fA-F_]，输出十进制文本
+            advance(2)
+            while isHex(peek(0)) or peek(0) == 95 {
+                advance(1)
+            }
+            v: Int = 0
+            p2: Int = start + 2
+            while p2 < pos {
+                ch: Int = load8(ptrAdd(src, p2))
+                if ch != 95 {
+                    d: Int = 0
+                    if ch >= 97 {
+                        d = ch - 87
+                    } elif ch >= 65 {
+                        d = ch - 55
+                    } else {
+                        d = ch - 48
+                    }
+                    v = v * 16 + d
+                }
+                p2 = p2 + 1
+            }
+            pushTok(K_INT, intToStr(v))
+        } else {
+            while isDigit(peek(0)) or peek(0) == 95 {
+                advance(1)
+            }
+            # 十进制：原样保留数字，去掉下划线
+            p: Ptr = alloc(pos - start + 1)
+            w: Int = 0
+            r: Int = start
+            while r < pos {
+                ch2: Int = load8(ptrAdd(src, r))
+                if ch2 != 95 {
+                    store8(ptrAdd(p, w), ch2)
+                    w = w + 1
+                }
+                r = r + 1
+            }
+            store8(ptrAdd(p, w), 0)
+            pushTok(K_INT, ptrToStr(p))
+        }
+    }
+
+    def lexString {
+        quote: Int = peek(0)
+        advance(1)
+        tmp: Int[512]
+        tl: Int = 0
+        closed: Bool = False
+        while pos < limit {
+            ch: Int = peek(0)
+            if ch == quote {
+                advance(1)
+                closed = True
+                break
+            }
+            if ch == 10 {
+                break
+            }
+            if ch == 92 {
+                if pos + 1 >= limit {
+                    break
+                }
+                e: Int = peek(1)
+                if e == 110 {
+                    tmp[tl] = 10
+                    tl = tl + 1
+                } elif e == 116 {
+                    tmp[tl] = 9
+                    tl = tl + 1
+                } elif e == 114 {
+                    tmp[tl] = 13
+                    tl = tl + 1
+                } elif e == 34 {
+                    tmp[tl] = 34
+                    tl = tl + 1
+                } elif e == 39 {
+                    tmp[tl] = 39
+                    tl = tl + 1
+                } elif e == 92 {
+                    tmp[tl] = 92
+                    tl = tl + 1
+                } elif e == 48 {
+                    tmp[tl] = 0
+                    tl = tl + 1
+                }
+                advance(2)
+            } else {
+                tmp[tl] = ch
+                tl = tl + 1
+                advance(1)
+            }
+        }
+        if closed {
+            p: Ptr = alloc(tl + 1)
+            i: Int = 0
+            while i < tl {
+                store8(ptrAdd(p, i), tmp[i])
+                i = i + 1
+            }
+            store8(ptrAdd(p, tl), 0)
+            pushTok(K_STR, ptrToStr(p))
+        }
+    }
+
+    def lexWord {
+        start: Int = pos
+        while isAlnum(peek(0)) {
+            advance(1)
+        }
+        s: Str = copyFromSrc(start, pos - start)
+        if kwIndex(s) >= 0 {
+            pushTok(K_KW, s)
+        } else {
+            pushTok(K_IDENT, s)
+        }
+    }
+
+    def lexPunc {
+        i: Int = 0
+        while i < 29 {
+            if srcHas(puns[i]) {
+                if puns[i] == "(" {
+                    depth = depth + 1
+                }
+                if puns[i] == "[" {
+                    depth = depth + 1
+                }
+                if puns[i] == ")" {
+                    if depth > 0 {
+                        depth = depth - 1
+                    }
+                }
+                if puns[i] == "]" {
+                    if depth > 0 {
+                        depth = depth - 1
+                    }
+                }
+                pushTok(K_PUNC, puns[i])
+                advance(strLen(puns[i]))
+                return
+            }
+            i = i + 1
+        }
+        advance(1)          # 无法识别的字符：跳过（Python 侧会记一条诊断）
+    }
+
+    def lex {
+        while pos < limit {
+            c: Int = peek(0)
+            if isSpace(c) {
+                advance(1)
+                continue
+            }
+            if c == 10 {
+                advance(1)
+                if depth == 0 {
+                    if count > 0 {
+                        if tkKind[count - 1] != K_NL {
+                            pushTok(K_NL, "")
+                        }
+                    }
+                }
+                continue
+            }
+            if c == 35 {
+                while pos < limit and peek(0) != 10 {
+                    advance(1)
+                }
+                continue
+            }
+            if c == 47 and peek(1) == 47 {
+                while pos < limit and peek(0) != 10 {
+                    advance(1)
+                }
+                continue
+            }
+            if c == 47 and peek(1) == 42 {
+                advance(2)
+                while pos < limit {
+                    if peek(0) == 42 and peek(1) == 47 {
+                        advance(2)
+                        break
+                    }
+                    advance(1)
+                }
+                continue
+            }
+            if c == 34 or c == 39 {
+                lexString()
+                continue
+            }
+            if isDigit(c) {
+                lexNumber()
+                continue
+            }
+            if isAlpha(c) {
+                lexWord()
+                continue
+            }
+            lexPunc()
+        }
+        if depth == 0 {
+            if count > 0 {
+                if tkKind[count - 1] != K_NL {
+                    pushTok(K_NL, "")
+                }
+            }
+        }
+        pushTok(K_EOF, "<eof>")
+    }
+
+    def dump {
+        i: Int = 0
+        while i < count {
+            if tkKind[i] == K_NL {
+                print(kindName(tkKind[i]), "|")
+            } else {
+                print(kindName(tkKind[i]), "|", tkText[i])
+            }
+            i = i + 1
+        }
+    }
+
+    on Start {
+        setup()
+        n: Int = loadSrc("build/lex_input.txt")
+        if n < 0 {
+            print("read fail")
+        } else {
+            lex()
+            dump()
+        }
+    }
+}

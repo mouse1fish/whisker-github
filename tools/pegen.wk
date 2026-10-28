@@ -1,0 +1,371 @@
+# pegen —— 用 Whisker 写的 PE 生成器（自举第 9 步·纵切验证）
+# 读取 build\rt_blob.bin（运行时机器码 blob，由 tools/extract_runtime.py 生成），
+# 拼出 PE 头 / 段 / 导入表，附带一小段用户代码（调运行时打印 42），落盘 build\selfhost.exe。
+actor Main {
+    # ---- blob 常量（tools/extract_runtime.py 的输出）----
+    RT_TEXT_LEN: Int = 3086
+    RT_RDATA_LEN: Int = 482
+    RT_DATA_LEN: Int = 17280
+    RT_DATA_OFF: Int = 3568                   # blob 内：rdata 结束处 = data 开始
+    RDATA_RVA: Int = 69632                    # 0x11000（固定布局：给用户代码留 64KB .text）
+    DATA_RVA: Int = 135168                    # 0x21000
+    IMAGE_SIZE: Int = 200704                  # 0x31000
+    IAT_RVA: Int = 152320                     # 0x21000 + 17152 = 0x25300
+    IAT_IN_DATA: Int = 17152
+    NIMPORT: Int = 15
+    OFF_RT_INIT: Int = 44
+    OFF_PBEGIN: Int = 1399
+    OFF_PRINT_INT: Int = 1569
+    OFF_PRINT_END: Int = 1807
+
+    USER_OFF: Int = 3104                      # align16(3086) = 用户代码在 .text 里的起始偏移
+    USER_RVA: Int = 7200                      # TEXT_RVA + USER_OFF = 0x1C80
+    TEXT_RVA: Int = 4096                      # 0x1000
+
+    blob: Ptr
+    out: Ptr
+    w: Int = 0
+    hintRVA: Int[16]
+
+    inames: Str[16]
+
+    def setupNames {
+        inames[0] = "GetStdHandle"
+        inames[1] = "WriteFile"
+        inames[2] = "VirtualAlloc"
+        inames[3] = "QueryPerformanceCounter"
+        inames[4] = "QueryPerformanceFrequency"
+        inames[5] = "CreateThread"
+        inames[6] = "GetSystemInfo"
+        inames[7] = "Sleep"
+        inames[8] = "ExitProcess"
+        inames[9] = "CreateEventA"
+        inames[10] = "SetEvent"
+        inames[11] = "WaitForSingleObject"
+        inames[12] = "CreateFileA"
+        inames[13] = "ReadFile"
+        inames[14] = "CloseHandle"
+    }
+
+    # ---- 写出原语 ----
+    def put8[b: Int] {
+        store8(ptrAdd(out, w), b % 256)
+        w = w + 1
+    }
+
+    def put16[v: Int] {
+        u: Int = v
+        if u < 0 {
+            u = u + 65536
+        }
+        put8(u % 256)
+        put8((u / 256) % 256)
+    }
+
+    def put32[v: Int] {
+        u: Int = v
+        if u < 0 {
+            u = u + 4294967296
+        }
+        put8(u % 256)
+        put8((u / 256) % 256)
+        put8((u / 65536) % 256)
+        put8((u / 16777216) % 256)
+    }
+
+    def put64[v: Int] {
+        lo: Int = v % 4294967296
+        hi: Int = (v - lo) / 4294967296
+        put32(lo)
+        put32(hi)
+    }
+
+    def putStr[s: Str] {
+        n: Int = strLen(s)
+        i: Int = 0
+        while i < n {
+            put8(load8(ptrAdd(strPtr(s), i)))
+            i = i + 1
+        }
+    }
+
+    def putZeros[n: Int] {
+        i: Int = 0
+        while i < n {
+            put8(0)
+            i = i + 1
+        }
+    }
+
+    def putBlob[at: Int, len: Int] {
+        copyBytes(ptrAdd(out, w), ptrAdd(blob, at), len)
+        w = w + len
+    }
+
+    def put8at[at: Int, b: Int] {
+        store8(ptrAdd(out, at), b % 256)
+    }
+
+    def put32at[at: Int, v: Int] {
+        u: Int = v
+        if u < 0 {
+            u = u + 4294967296
+        }
+        store8(ptrAdd(out, at), u % 256)
+        store8(ptrAdd(out, at + 1), (u / 256) % 256)
+        store8(ptrAdd(out, at + 2), (u / 65536) % 256)
+        store8(ptrAdd(out, at + 3), (u / 16777216) % 256)
+    }
+
+    def put64at[at: Int, v: Int] {
+        put8at(at, v % 256)
+        put8at(at + 1, (v / 256) % 256)
+        put8at(at + 2, (v / 65536) % 256)
+        put8at(at + 3, (v / 16777216) % 256)
+        put8at(at + 4, (v / 4294967296) % 256)
+        put8at(at + 5, (v / 1099511627776) % 256)
+        put8at(at + 6, (v / 4503599627370496) % 256)
+        put8at(at + 7, (v / 72057594037927936) % 256)
+    }
+
+    # ---- 用户代码（演示程序：调运行时打印 42）----
+    userLen: Int = 40
+
+    def emitUserCode[at: Int] {
+        # call rt_init
+        put8at(at, 232)
+        put32at(at + 1, OFF_RT_INIT - (TEXT_RVA + at + 5))
+        # call rt_print_begin
+        put8at(at + 5, 232)
+        put32at(at + 6, OFF_PBEGIN - (TEXT_RVA + at + 10))
+        # mov rcx, 42
+        put8at(at + 10, 72)
+        put8at(at + 11, 199)
+        put8at(at + 12, 193)
+        put32at(at + 13, 42)
+        # call rt_print_int
+        put8at(at + 17, 232)
+        put32at(at + 18, OFF_PRINT_INT - (TEXT_RVA + at + 22))
+        # call rt_print_end
+        put8at(at + 22, 232)
+        put32at(at + 23, OFF_PRINT_END - (TEXT_RVA + at + 27))
+        # mov rcx, 0
+        put8at(at + 27, 72)
+        put8at(at + 28, 199)
+        put8at(at + 29, 193)
+        put32at(at + 30, 0)
+        # call ExitProcess（经 IAT：FF 15 disp32）
+        put8at(at + 34, 255)
+        put8at(at + 35, 21)
+        put32at(at + 36, IAT_RVA + 64 - (TEXT_RVA + at + 40))
+    }
+
+    def main {
+        setupNames()
+
+        # ---- 1) 读运行时 blob（注意：要装下 text+rdata+data 全部 20848 字节）----
+        blob = alloc(RT_DATA_OFF + RT_DATA_LEN + 16)
+        got: Int = readBytes("build/rt_blob.bin", blob, RT_DATA_OFF + RT_DATA_LEN)
+        print("blob 读入 = ", got, " 字节")
+
+        # ---- 2) 布局（.text/.rdata/.data 各 64KB，RVA 固定）----
+        userLen: Int = 40
+        textRaw: Int = 65536
+        impSize: Int = 40 + 8 * (NIMPORT + 1) + 13
+        i: Int = 0
+        while i < NIMPORT {
+            impSize = impSize + 2 + strLen(inames[i]) + 1
+            i = i + 1
+        }
+        rdataUsed: Int = RT_RDATA_LEN + impSize
+        rdataRaw: Int = 65536
+        dataRaw: Int = 65536
+        fileSize: Int = 512 + textRaw + rdataRaw + dataRaw
+        rdataRva: Int = RDATA_RVA
+        dataRva: Int = DATA_RVA
+
+        # ---- 3) 分配输出缓冲并生成 ----
+        out = alloc(fileSize + 16)
+        w = 0
+
+        # DOS 头
+        put8(77)
+        put8(90)
+        putZeros(58)
+        put32(64)
+        # PE 签名 + COFF
+        putStr("PE")
+        put8(0)
+        put8(0)
+        put16(34404)
+        put16(3)
+        put32(0)
+        put32(0)
+        put32(0)
+        put16(240)
+        put16(34)
+        # 可选头（PE32+，240 字节）
+        put16(523)
+        put8(14)
+        put8(0)
+        put32(textRaw)
+        put32(rdataRaw + dataRaw)
+        put32(0)
+        put32(TEXT_RVA + USER_OFF)
+        put32(TEXT_RVA)
+        put64(5368709120)
+        put32(4096)
+        put32(512)
+        put16(6)
+        put16(0)
+        put16(0)
+        put16(0)
+        put16(6)
+        put16(0)
+        put32(0)
+        put32(IMAGE_SIZE)
+        put32(512)
+        put32(0)
+        put16(3)
+        put16(0)
+        put64(1048576)
+        put64(4096)
+        put64(1048576)
+        put64(4096)
+        put32(0)
+        put32(16)
+        # 数据目录 16 项：[1] 导入表  [12] IAT
+        put32(0)
+        put32(0)
+        put32(rdataRva + RT_RDATA_LEN)
+        put32(40)
+        putZeros(80)
+        put32(IAT_RVA)
+        put32(8 * (NIMPORT + 1))
+        putZeros(24)
+        # 段表（名字必须补满 8 字节）
+        putStr(".text")
+        putZeros(3)
+        put32(textRaw)
+        put32(TEXT_RVA)
+        put32(textRaw)
+        put32(512)
+        put32(0)
+        put32(0)
+        put16(0)
+        put16(0)
+        put32(1610612768)
+        putStr(".rdata")
+        putZeros(2)
+        put32(rdataRaw)
+        put32(rdataRva)
+        put32(rdataRaw)
+        put32(512 + textRaw)
+        put32(0)
+        put32(0)
+        put16(0)
+        put16(0)
+        put32(1073741888)
+        putStr(".data")
+        putZeros(3)
+        put32(dataRaw)
+        put32(dataRva)
+        put32(dataRaw)
+        put32(512 + textRaw + rdataRaw)
+        put32(0)
+        put32(0)
+        put16(0)
+        put16(0)
+        put32(3221225536)
+
+        putZeros(512 - w)
+
+        # ---- .text：blob + 用户代码 ----
+        w = 512
+        putBlob(0, RT_TEXT_LEN)
+        putZeros(USER_OFF - RT_TEXT_LEN)
+        # 用户代码（w 相对写；rel32 按 .text 内偏移计算）
+        w = 512 + USER_OFF
+        put8(232)
+        put32(OFF_RT_INIT - (USER_OFF + 5))
+        put8(232)
+        put32(OFF_PBEGIN - (USER_OFF + 10))
+        put8(72)
+        put8(199)
+        put8(193)
+        put32(42)
+        put8(232)
+        put32(OFF_PRINT_INT - (USER_OFF + 22))
+        put8(232)
+        put32(OFF_PRINT_END - (USER_OFF + 27))
+        put8(72)
+        put8(199)
+        put8(193)
+        put32(0)
+        put8(255)
+        put8(21)
+        put32(IAT_RVA + 64 - (TEXT_RVA + USER_OFF + 40))
+        w = 512 + textRaw
+        putZeros(textRaw - USER_OFF - userLen)
+
+        # ---- .rdata：blob rdata + 导入表结构 ----
+        w = 512 + textRaw
+        putBlob(RT_TEXT_LEN, RT_RDATA_LEN)
+        impBase: Int = RT_RDATA_LEN
+        iltRVA: Int = rdataRva + impBase + 40
+        dllRVA: Int = iltRVA + 8 * (NIMPORT + 1)
+        put32(iltRVA)                           # OriginalFirstThunk
+        put32(0)                                # TimeDateStamp
+        put32(0)                                # ForwarderChain
+        put32(dllRVA)                           # Name
+        put32(IAT_RVA)                          # FirstThunk
+        w = 512 + textRaw + impBase + 40        # ILT（PE32+ 每条 8 字节）
+        j: Int = 0
+        while j < NIMPORT + 1 {
+            if j < NIMPORT {
+                hint: Int = dllRVA + 13
+                k: Int = 0
+                while k < j {
+                    hint = hint + 2 + strLen(inames[k]) + 1
+                    k = k + 1
+                }
+                put32at(w + 8 * j, hint)
+                hintRVA[j] = hint
+            } else {
+                put32at(w + 8 * j, 0)
+            }
+            j = j + 1
+        }
+        w = 512 + textRaw + dllRVA - rdataRva
+        putStr("kernel32.dll")
+        put8(0)
+        j = 0
+        while j < NIMPORT {
+            put16(0)
+            putStr(inames[j])
+            put8(0)
+            j = j + 1
+        }
+        putZeros(rdataRaw - rdataUsed)
+
+        # ---- .data：blob data（IAT 槽写 hint RVA）----
+        w = 512 + textRaw + rdataRaw
+        putBlob(RT_TEXT_LEN + RT_RDATA_LEN, RT_DATA_LEN)
+        print('A4 后 out[22276] = ', intToStr(load8(ptrAdd(out, 22276))))
+        j = 0
+        while j < NIMPORT {
+            put32at(w - RT_DATA_LEN + IAT_IN_DATA + 8 * j, hintRVA[j])
+            j = j + 1
+        }
+        putZeros(dataRaw - RT_DATA_LEN)
+        print('B4 后 out[22276] = ', intToStr(load8(ptrAdd(out, 22276))))
+
+        # ---- 落盘 ----
+        wrote: Int = writeBytes("build/selfhost.exe", out, fileSize)
+        print("selfhost.exe 写出 = ", wrote, " 字节（文件应为 ", fileSize, "）")
+    }
+
+    on Start {
+        main()
+    }
+}

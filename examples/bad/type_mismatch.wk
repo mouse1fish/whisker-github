@@ -1,0 +1,18 @@
+// 反例 2：消息参数类型不对 + if 条件不是 Bool —— 一次性报多个错
+actor Counter {
+    total: Int = 0
+
+    on Inc[n: Int] {
+        total = total + n
+    }
+}
+
+actor Main {
+    on Start {
+        c: ActorRef[Counter] = spawn Counter
+        c.send(Inc("三"))
+        if 1 {
+            print("这里进不去")
+        }
+    }
+}

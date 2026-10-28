@@ -1,0 +1,6 @@
+actor Main {
+    on Start {
+        a: Int = 1
+        print(a)
+    }
+}

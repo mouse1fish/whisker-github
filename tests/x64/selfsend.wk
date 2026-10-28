@@ -1,0 +1,17 @@
+// x64 后端微测试 1：自发自收（多参数消息 + 状态字段）
+actor Main {
+    n: Int = 0
+
+    on Start {
+        self.send(Bump(1, 100))
+    }
+
+    on Bump[step: Int, left: Int] {
+        n = n + step
+        if left > 0 {
+            self.send(Bump(step + 1, left - 1))
+        } else {
+            print("累加完成 n = ", n)
+        }
+    }
+}

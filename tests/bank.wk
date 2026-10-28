@@ -1,0 +1,110 @@
+// 我自己写的用例 2：账户间转账，总额必须守恒
+//
+// 这里的关键是「什么时候可以读余额」——典型的 actor 屏障问题：
+// 转账会派生新的 Deposit 消息，所以光知道「20000 笔转账都处理完了」还不够。
+// 解法：计数屏障。Main 能算清两类通知的确切条数：
+//   ① 每笔转账产出 1 条结果通知（Moved / Rejected）→ 共 20000 条
+//   ② 每笔成功的转账会派生 1 条 Deposit，被处理时回报 1 条 Deposited → 共 successes 条
+// 两类计数都到齐，系统里就再没有任何在途消息，此时读余额才安全。
+actor Account {
+    balance: Int = 0
+    hub: ActorRef[Main]
+
+    on Open[h: ActorRef[Main], initial: Int] {
+        hub = h
+        balance = initial
+    }
+
+    on TransferTo[target: ActorRef[Account], n: Int] {
+        if n > balance {
+            hub.send(Rejected())
+        } else {
+            balance = balance - n
+            target.send(Deposit(n))
+            hub.send(Moved(n))
+        }
+    }
+
+    on Deposit[n: Int] {
+        balance = balance + n
+        hub.send(Deposited())
+    }
+
+    on Ask[reply: ActorRef[Main]] {
+        reply.send(Balance(balance))
+    }
+}
+
+actor Main {
+    a: ActorRef[Account]
+    b: ActorRef[Account]
+    c: ActorRef[Account]
+    seed: Int = 12345
+    outcomes: Int = 0
+    successes: Int = 0
+    deposits_done: Int = 0
+    asked: Bool = false
+    reports: Int = 0
+    total: Int = 0
+
+    on Start {
+        a = spawn Account
+        b = spawn Account
+        c = spawn Account
+        a.send(Open(self, 1000))
+        b.send(Open(self, 2000))
+        c.send(Open(self, 3000))
+
+        i: Int = 0
+        while i < 20000 {
+            seed = (seed * 1103515245 + 12345) % 2147483648
+            amount: Int = seed % 400
+            pick: Int = seed % 3
+            if pick == 0 {
+                a.send(TransferTo(b, amount))
+            } else {
+                if pick == 1 {
+                    b.send(TransferTo(c, amount))
+                } else {
+                    c.send(TransferTo(a, amount))
+                }
+            }
+            i = i + 1
+        }
+    }
+
+    on Moved[n: Int] {
+        outcomes = outcomes + 1
+        successes = successes + 1
+        self.send(Check())
+    }
+
+    on Rejected {
+        outcomes = outcomes + 1
+        self.send(Check())
+    }
+
+    on Deposited {
+        deposits_done = deposits_done + 1
+        self.send(Check())
+    }
+
+    on Balance[v: Int] {
+        reports = reports + 1
+        total = total + v
+        if reports == 3 {
+            print("三账户总额 = ", total, "（期望 6000）")
+            print("转账 20000 笔，成功 ", successes, " 笔，余额不足被拒 ", outcomes - successes, " 笔")
+        }
+    }
+
+    // 两类计数都到齐 → 系统已静止 → 现在读余额是安全的
+    on Check {
+        if outcomes == 20000 && deposits_done == successes && !asked {
+            asked = true
+            a.send(Ask(self))
+            b.send(Ask(self))
+            c.send(Ask(self))
+        }
+    }
+}

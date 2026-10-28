@@ -1,0 +1,54 @@
+// 环形拓扑：两个 Player 通过 Connect 消息互持对方引用，然后互相抛 20 万次
+// 演示三件事：ActorRef 字段的 connect 握手、消息驱动的状态机、由 Main 做监督与汇总
+actor Player {
+    peer: ActorRef[Player]
+    hub: ActorRef[Main]
+    hops: Int = 0
+
+    on Connect[p: ActorRef[Player], h: ActorRef[Main]] {
+        peer = p
+        hub = h
+    }
+
+    on Hop[n: Int, left: Int] {
+        hops = hops + 1
+        if left > 0 {
+            peer.send(Hop(n + 1, left - 1))
+        } else {
+            hub.send(Finished(n))
+        }
+    }
+
+    on Ask[reply: ActorRef[Main]] {
+        reply.send(Report(hops))
+    }
+}
+
+actor Main {
+    a: ActorRef[Player]
+    b: ActorRef[Player]
+    reports: Int = 0
+    sum: Int = 0
+
+    on Start {
+        a = spawn Player
+        b = spawn Player
+        a.send(Connect(b, self))
+        b.send(Connect(a, self))
+        a.send(Hop(1, 200000))
+    }
+
+    on Finished[last: Int] {
+        print("链条结束，最后一跳编号 = ", last)
+        a.send(Ask(self))
+        b.send(Ask(self))
+    }
+
+    on Report[hops: Int] {
+        reports = reports + 1
+        sum = sum + hops
+        if reports == 2 {
+            print("两方累计跳数 = ", sum, "（期望 200001）")
+        }
+    }
+}

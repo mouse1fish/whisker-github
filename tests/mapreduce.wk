@@ -1,0 +1,38 @@
+// 我自己写的用例 4：分片汇总（每个分片交给一个独立 actor 算，最后汇总比对）
+actor Worker {
+    on Slice[lo: Int, hi: Int, reply: ActorRef[Main]] {
+        s: Int = 0
+        i: Int = lo
+        while i <= hi {
+            s = s + (i % 97) * (i % 97)
+            i = i + 1
+        }
+        reply.send(Part(s))
+    }
+}
+
+actor Main {
+    n: Int = 32
+    got: Int = 0
+    total: Int = 0
+    span: Int = 2000000
+
+    on Start {
+        k: Int = 0
+        while k < n {
+            w: ActorRef[Worker] = spawn Worker
+            lo: Int = k * (span / n) + 1
+            hi: Int = (k + 1) * (span / n)
+            w.send(Slice(lo, hi, self))
+            k = k + 1
+        }
+    }
+
+    on Part[s: Int] {
+        got = got + 1
+        total = total + s
+        if got == n {
+            print(n, " 个分片汇总结果 = ", total)
+        }
+    }
+}

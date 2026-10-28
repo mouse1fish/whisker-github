@@ -1,0 +1,63 @@
+// 并行计算演示：同一道题，先串行算一遍做基线，再切成 64 片交给 64 个 actor 并行算
+// 每个 actor 的中间变量都是它自己的私有状态，不需要任何锁
+actor Worker {
+    on Chunk[lo: Int, hi: Int, reply: ActorRef[Main]] {
+        s: Int = 0
+        i: Int = lo
+        while i <= hi {
+            s = s + (i % 1000) * (i % 1000)
+            i = i + 1
+        }
+        reply.send(Result(s))
+    }
+}
+
+actor Main {
+    got: Int = 0
+    total: Int = 0
+    t0: Int = 0
+    serial: Int = 0
+    nworkers: Int = 64
+    span: Int = 200000000
+
+    on Start {
+        print("题目：对 1..", span, " 每个数取平方后累加")
+        print("")
+
+        // 基线：单 actor 串行
+        ts: Int = nowMs()
+        s: Int = 0
+        i: Int = 1
+        while i <= span {
+            s = s + (i % 1000) * (i % 1000)
+            i = i + 1
+        }
+        serial_ms: Int = nowMs() - ts
+        serial = s
+        print("串行（1 个 actor）  用时 ", serial_ms, " ms   结果 = ", s)
+
+        // 并行：切成 64 片
+        t0 = nowMs()
+        k: Int = 0
+        while k < nworkers {
+            w: ActorRef[Worker] = spawn Worker
+            lo: Int = k * (span / nworkers) + 1
+            hi: Int = (k + 1) * (span / nworkers)
+            w.send(Chunk(lo, hi, self))
+            k = k + 1
+        }
+    }
+
+    on Result[part: Int] {
+        got = got + 1
+        total = total + part
+        if got == nworkers {
+            print("并行（", nworkers, " 个 actor）  用时 ", nowMs() - t0, " ms   结果 = ", total)
+            if total == serial {
+                print("结果校验：与串行完全一致")
+            } else {
+                print("结果校验：不一致，请检查")
+            }
+        }
+    }
+}

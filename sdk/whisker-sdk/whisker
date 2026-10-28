@@ -1,0 +1,36 @@
+#!/usr/bin/env sh
+# Whisker SDK wrapper (POSIX sh; requires Windows x64 to run wkcc2.exe)
+# Usage:
+#   whisker compile input.wk [output.exe]
+#   whisker version
+set -e
+SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+
+case "$1" in
+    version|--version)
+        echo "Whisker SDK (self-hosted compiler wkcc2)"; exit 0 ;;
+    compile)
+        shift ;;
+    *)
+        echo "Usage: whisker compile input.wk [output.exe]"; exit 1 ;;
+esac
+
+SRC="$1"; OUT="$2"
+if [ -z "$SRC" ]; then echo "Usage: whisker compile input.wk [output.exe]"; exit 1; fi
+if [ ! -f "$SRC" ]; then echo "Error: not found: $SRC"; exit 1; fi
+if [ -z "$OUT" ]; then OUT="$(basename "${SRC%.*}").exe"; fi
+
+# wkcc2 reads ./build/lex_input.txt + ./build/rt_blob.bin relative to CWD,
+# so run it inside an isolated temp build dir and ship the result back.
+TD=$(mktemp -d)
+trap 'rm -rf "$TD"' EXIT
+mkdir -p "$TD/build"
+cp "$SELF_DIR/share/rt_blob.bin" "$TD/build/rt_blob.bin"
+cp "$SRC" "$TD/build/lex_input.txt"
+
+if ! (cd "$TD" && "$SELF_DIR/bin/wkcc2.exe"); then
+    echo "Error: compilation failed (see [wkcc] lines above)"
+    exit 1
+fi
+cp "$TD/build/selfhost.exe" "$OUT"
+echo "OK: $OUT"

@@ -1,0 +1,25 @@
+// x64 后端微测试 2：spawn 一个 actor 并互发消息（ActorRef 参数 + 字段初值）
+actor Child {
+    got: Int = 0
+
+    on Ping[reply: ActorRef[Main]] {
+        got = got + 1
+        reply.send(Pong(got))
+    }
+}
+
+actor Main {
+    total: Int = 0
+
+    on Start {
+        c: ActorRef[Child] = spawn Child
+        c.send(Ping(self))
+        c.send(Ping(self))
+        c.send(Ping(self))
+    }
+
+    on Pong[v: Int] {
+        total = total + v
+        print("收到 Pong(", v, ") 累计 ", total)
+    }
+}

@@ -1,0 +1,22 @@
+# ===== 本地工作区（永不上传）=====
+.workbuddy/
+backups/
+NVIDIA Corporation/
+.github-local/
+
+# ===== build 目录：只保留 4 个关键文件（已入库），其余构建/调试产物忽略 =====
+build/*
+!build/rt_blob.bin
+!build/wkcc2.exe
+!build/wkcc.exe
+!build/selfhost.exe
+
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
+
+# ===== 临时与日志 =====
+*.log
+*.tmp
+~$*

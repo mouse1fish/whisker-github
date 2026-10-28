@@ -1,0 +1,48 @@
+# 用 Whisker 自己的格式落盘一个文件：.wko（Whisker Object）
+#   magic "WKO1" | 版本 | 载荷长度 | 载荷
+# 这一份 demo 只用语言自己的能力（数组 + 文件读写）完成「构造字节 → 落盘 → 读回校验」，
+# 也就是编译器后面要反复做的事：把机器码字节攒进缓冲区，再写成文件。
+actor Main {
+    hdr: Int[8]
+
+    def put_bytes[buf: Int[64], at: Int, value: Int] {
+        buf[at] = value
+    }
+
+    on Start {
+        buf: Int[64]
+
+        # ---- 构造头部 ----
+        # magic："WKO1" 按小端放成 i64（低 4 字节是 'W','K','O','1'）
+        buf[0] = 0x31_4F_4B_57          # 'W''K''O''1' 反过来看就是 WKO1
+        buf[1] = 1                       # 版本
+        buf[2] = 16                      # 载荷：16 个 i64 = 128 字节
+        buf[3] = 0                       # 校验位（先占位）
+
+        # ---- 构造载荷：0..15 的平方 ----
+        for i in 0 .. 16 {
+            buf[4 + i] = i * i
+        }
+
+        # ---- 写文件：4 个头部 i64 + 16 个载荷 i64 = 20 个 i64 = 160 字节 ----
+        wrote: Int = writeFile("build/demo.wko", buf, 160)
+        print("wko 写入字节数 = ", wrote, "（期望 160）")
+
+        # ---- 读回并校验 ----
+        rbuf: Int[64]
+        got: Int = readFile("build/demo.wko", rbuf, 512)
+        print("wko 读回字节数 = ", got, "（期望 160）")
+
+        magic_ok: Bool = rbuf[0] == 0x31_4F_4B_57
+        ver_ok: Bool = rbuf[1] == 1
+        len_ok: Bool = rbuf[2] == 16
+        body_ok: Bool = True
+        for i in 0 .. 16 {
+            if rbuf[4 + i] != i * i {
+                body_ok = False
+            }
+        }
+        print("magic/版本/长度 = ", magic_ok, " ", ver_ok, " ", len_ok, "（期望 true true true）")
+        print("载荷校验 = ", body_ok, "（期望 true）")
+    }
+}
