@@ -48,7 +48,7 @@ IMPORTS = ["GetStdHandle", "WriteFile", "VirtualAlloc",
            "CreateEventA", "SetEvent", "WaitForSingleObject",
            "CreateFileA", "ReadFile", "CloseHandle",
            "GetTickCount64", "CreateProcessA", "GetExitCodeProcess",
-           "CreatePipe", "SetHandleInformation"]
+           "CreatePipe", "SetHandleInformation", "GetCommandLineA"]
 
 # Winsock2：网络原语走 ws2_32.dll（导入表已支持多 DLL）
 WS2_IMPORTS = ["WSAStartup", "socket", "inet_addr", "htons", "bind", "listen",
@@ -1345,6 +1345,12 @@ def emit_runtime(a: Asm, pe: PEBuilder) -> None:
     f.close()
 
     # ================= agent 原语（EonOS）：屏幕 / 鼠标 / 键盘 =================
+    a.note("rt_cmdline() -> 完整命令行字符串（GetCommandLineA，ANSI）")
+    a.label("rt_cmdline")
+    f = Frame(a)
+    a.call_rip("imp_GetCommandLineA")
+    f.close()
+
     a.note("rt_screen_w / rt_screen_h（GetSystemMetrics）")
     a.label("rt_screen_w")
     f = Frame(a)

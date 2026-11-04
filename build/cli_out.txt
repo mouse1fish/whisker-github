@@ -1,0 +1,2 @@
+[wkcc] 编译 examples\hello.wk -> build\cli_test.exe
+build\cli_test.exe 写出 = 30720 字节

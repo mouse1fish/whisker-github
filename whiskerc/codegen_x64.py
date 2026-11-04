@@ -864,6 +864,9 @@ class Fn:
             if e.name == "netErr":
                 a.call("rt_net_err")
                 return
+            if e.name == "cmdline":
+                a.call("rt_cmdline")
+                return
             if e.name == "screenW":
                 a.call("rt_screen_w")
                 return

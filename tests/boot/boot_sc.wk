@@ -1,0 +1,11 @@
+# and/or 短路求值（左侧定值时不求值右侧）
+actor Main {
+    on Start {
+        if 0 and side() { print("bad1") }
+        if 1 or side() { print("sc ok") }
+    }
+    def side -> Bool {
+        print("side-called")
+        return True
+    }
+}

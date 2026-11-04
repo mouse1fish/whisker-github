@@ -1,0 +1,2 @@
+[wkcc] 编译 examples\hello.wk -> build\t3.exe
+build\t3.exe 写出 = 30720 字节

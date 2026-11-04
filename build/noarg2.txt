@@ -1,0 +1,6 @@
+[cli] 1 entered
+[cli] 2 line="G:\trea-Eon-os\trea-xiancheng-bianyiqi\build\wkcc2.exe" tools\wkcc.wk build\selfhost.exe 
+[cli] 3 prog=G:\trea-Eon-os\trea-xiancheng-bianyiqi\build\wkcc2.exe
+[cli] 4 a1=[tools\wkcc.wk]
+[wkcc] 编译 tools\wkcc.wk -> build\selfhost.exe
+build\selfhost.exe 写出 = 104448 字节

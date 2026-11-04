@@ -1,0 +1,7 @@
+# 最小验证：字符串字段初值
+actor Main {
+    s: Str = "HELLO-FIELD"
+    on Start {
+        print("field=[", s, "]")
+    }
+}

@@ -1,0 +1,5 @@
+# 字符串字段初值（2026-11-03 修复：wkcc 曾写裸 RVA 导致指针不可解引用）
+actor Main {
+    s: Str = "HELLO-FIELD"
+    on Start { print(s) }
+}

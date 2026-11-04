@@ -1,0 +1,16 @@
+# builtins_demo.wk —— 新内置函数演示（系统原语 + agent 原语 + 字符串工具）
+actor Main {
+    on Start {
+        # 时钟
+        print("墙钟毫秒: ", wallMs())
+        # 数值 / 指针 cast
+        p: Ptr = alloc(16)
+        store8(p, 65)
+        print("ptrToInt 往返: ", load8(intToPtr(ptrToInt(p))))
+        # agent：屏幕与光标（只读，安全）
+        print("屏幕: ", screenW(), "x", screenH())
+        print("光标: (", mouseX(), ",", mouseY(), ")")
+        # 键盘映射：'A' 需要 Shift（高字节 1），低字节是键码 0x41=65
+        print("VK('A') = ", keyVk(65))
+    }
+}

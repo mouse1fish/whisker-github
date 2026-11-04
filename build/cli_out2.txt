@@ -1,0 +1,2 @@
+[wkcc] 编译 tools\wkcc.wk -> build\selfhost.exe
+build\selfhost.exe 写出 = 103936 字节

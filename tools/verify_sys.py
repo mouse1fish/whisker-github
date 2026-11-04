@@ -44,8 +44,8 @@ def build_python(case: str) -> Path:
 
 
 def build_selfhost(case: str) -> Path:
-    (BUILD / "lex_input.txt").write_bytes((ROOT / f"tests/x64/{case}.wk").read_bytes())
     exe = BUILD / "selfhost.exe"
+    src = ROOT / f"tests/x64/{case}.wk"
     # 先删旧产物：避免"上一次的 exe"被误当成本次结果
     if exe.exists():
         try:
@@ -53,7 +53,8 @@ def build_selfhost(case: str) -> Path:
         except OSError:
             pass
     for attempt in range(3):
-        r = subprocess.run([str(BUILD / "wkcc2.exe")], cwd=str(ROOT),
+        # wkcc2 CLI 传参（2026-11-03 起支持）
+        r = subprocess.run([str(BUILD / "wkcc2.exe"), str(src), str(exe)], cwd=str(ROOT),
                            capture_output=True, text=True, errors="replace")
         if exe.exists() and "写出" in r.stdout:
             return exe

@@ -1,0 +1,5 @@
+# def 前向引用（handler 调用定义在后的 def）
+actor Main {
+    on Start { print(calc(6, 7)) }
+    def calc[a: Int, b: Int] -> Int { return a * b }
+}

@@ -1,0 +1,7 @@
+# 字符串内置
+actor Main {
+    on Start {
+        a: Str = strCat("ab", "c")
+        print("n=", strLen(a), " s=", a, " ", strToInt("7"))
+    }
+}

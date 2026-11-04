@@ -64,28 +64,29 @@ actor Main {
     OFF_PROC_WAIT: Int = 4947
     OFF_PROC_FREE: Int = 5036
     # ---- agent 原语（EonOS：屏幕/鼠标/键盘）----
-    OFF_SCREEN_W: Int = 5107
-    OFF_SCREEN_H: Int = 5139
-    OFF_MOUSE_X: Int = 5175
-    OFF_MOUSE_Y: Int = 5240
-    OFF_MOUSE_MOVE: Int = 5306
-    OFF_MOUSE_DOWN: Int = 5335
-    OFF_MOUSE_UP: Int = 5443
-    OFF_KEY_DOWN: Int = 5555
-    OFF_KEY_UP: Int = 5593
-    OFF_KEY_VK: Int = 5635
-    OFF_SCREENSHOT: Int = 5668
-    RT_TEXT_LEN: Int = 6222
-    RT_RDATA_LEN: Int = 1357
-    RT_DATA_LEN: Int = 18160
-    RT_DATA_OFF: Int = 7579            # blob bin 内 data 段起点 = RT_TEXT_LEN + RT_RDATA_LEN
+    OFF_CMDLINE: Int = 5107
+    OFF_SCREEN_W: Int = 5133
+    OFF_SCREEN_H: Int = 5165
+    OFF_MOUSE_X: Int = 5201
+    OFF_MOUSE_Y: Int = 5266
+    OFF_MOUSE_MOVE: Int = 5332
+    OFF_MOUSE_DOWN: Int = 5361
+    OFF_MOUSE_UP: Int = 5469
+    OFF_KEY_DOWN: Int = 5581
+    OFF_KEY_UP: Int = 5619
+    OFF_KEY_VK: Int = 5661
+    OFF_SCREENSHOT: Int = 5694
+    RT_TEXT_LEN: Int = 6248
+    RT_RDATA_LEN: Int = 1383
+    RT_DATA_LEN: Int = 18168
+    RT_DATA_OFF: Int = 7631            # blob bin 内 data 段起点 = RT_TEXT_LEN + RT_RDATA_LEN
     RDATA_RVA: Int = 135168            # 0x21000（.text 预留 0x20000 = 128KB 给用户代码）
     DATA_RVA: Int = 200704             # 0x31000
     IMAGE_SIZE: Int = 221184           # 0x36000
     IAT_RVA: Int = 218472              # 0x35530 = DATA_RVA + IAT_IN_DATA
     IAT_IN_DATA: Int = 17768
     NIMPORT: Int = 48
-    NIMP_KERNEL32: Int = 21
+    NIMP_KERNEL32: Int = 22
     NIMP_WS2: Int = 12
     NIMP_USER32: Int = 8
     NIMP_GDI32: Int = 7
@@ -97,6 +98,12 @@ actor Main {
     cw: Int = 0                # 用户代码写偏移
     USER_RVA: Int = 12288      # 0x3000 = TEXT_RVA + USER_OFF：用户代码区起始 RVA（.text 内 blob 之后，blob text 4715B）
     entryPos: Int = 0          # entry 代码在用户代码区内的偏移（所有 actor 之后发射）
+    # ---- CLI（cmdline 原语，2026-11-03）----
+    inPath: Str = "build/lex_input.txt"     # 输入 .wk（无参数时的默认值，向后兼容）
+    outPath: Str = "build/selfhost.exe"     # 输出 exe（同上）
+    blobPath: Str = "build/rt_blob.bin"     # 运行时 blob（第 3 个参数可覆盖；SDK 用）
+    argLine: Str = ""
+    argPos: Int = 0
     TEXT_RVA: Int = 4096       # 0x1000
 
     # ================= .rdata 字符串区 =================
@@ -202,33 +209,34 @@ actor Main {
         inames[18] = "GetExitCodeProcess"
         inames[19] = "CreatePipe"
         inames[20] = "SetHandleInformation"
-        inames[21] = "WSAStartup"
-        inames[22] = "socket"
-        inames[23] = "inet_addr"
-        inames[24] = "htons"
-        inames[25] = "bind"
-        inames[26] = "listen"
-        inames[27] = "accept"
-        inames[28] = "connect"
-        inames[29] = "send"
-        inames[30] = "recv"
-        inames[31] = "closesocket"
-        inames[32] = "WSAGetLastError"
-        inames[33] = "GetDC"
-        inames[34] = "ReleaseDC"
-        inames[35] = "GetSystemMetrics"
-        inames[36] = "SetCursorPos"
-        inames[37] = "mouse_event"
-        inames[38] = "keybd_event"
-        inames[39] = "VkKeyScanA"
-        inames[40] = "GetCursorPos"
-        inames[41] = "CreateCompatibleDC"
-        inames[42] = "CreateCompatibleBitmap"
-        inames[43] = "SelectObject"
-        inames[44] = "BitBlt"
-        inames[45] = "GetDIBits"
-        inames[46] = "DeleteDC"
-        inames[47] = "DeleteObject"
+        inames[21] = "GetCommandLineA"
+        inames[22] = "WSAStartup"
+        inames[23] = "socket"
+        inames[24] = "inet_addr"
+        inames[25] = "htons"
+        inames[26] = "bind"
+        inames[27] = "listen"
+        inames[28] = "accept"
+        inames[29] = "connect"
+        inames[30] = "send"
+        inames[31] = "recv"
+        inames[32] = "closesocket"
+        inames[33] = "WSAGetLastError"
+        inames[34] = "GetDC"
+        inames[35] = "ReleaseDC"
+        inames[36] = "GetSystemMetrics"
+        inames[37] = "SetCursorPos"
+        inames[38] = "mouse_event"
+        inames[39] = "keybd_event"
+        inames[40] = "VkKeyScanA"
+        inames[41] = "GetCursorPos"
+        inames[42] = "CreateCompatibleDC"
+        inames[43] = "CreateCompatibleBitmap"
+        inames[44] = "SelectObject"
+        inames[45] = "BitBlt"
+        inames[46] = "GetDIBits"
+        inames[47] = "DeleteDC"
+        inames[48] = "DeleteObject"
     }
 
     # ================= 词法（与之前版本相同） =================
@@ -306,33 +314,34 @@ actor Main {
         inames[18] = "GetExitCodeProcess"
         inames[19] = "CreatePipe"
         inames[20] = "SetHandleInformation"
-        inames[21] = "WSAStartup"
-        inames[22] = "socket"
-        inames[23] = "inet_addr"
-        inames[24] = "htons"
-        inames[25] = "bind"
-        inames[26] = "listen"
-        inames[27] = "accept"
-        inames[28] = "connect"
-        inames[29] = "send"
-        inames[30] = "recv"
-        inames[31] = "closesocket"
-        inames[32] = "WSAGetLastError"
-        inames[33] = "GetDC"
-        inames[34] = "ReleaseDC"
-        inames[35] = "GetSystemMetrics"
-        inames[36] = "SetCursorPos"
-        inames[37] = "mouse_event"
-        inames[38] = "keybd_event"
-        inames[39] = "VkKeyScanA"
-        inames[40] = "GetCursorPos"
-        inames[41] = "CreateCompatibleDC"
-        inames[42] = "CreateCompatibleBitmap"
-        inames[43] = "SelectObject"
-        inames[44] = "BitBlt"
-        inames[45] = "GetDIBits"
-        inames[46] = "DeleteDC"
-        inames[47] = "DeleteObject"
+        inames[21] = "GetCommandLineA"
+        inames[22] = "WSAStartup"
+        inames[23] = "socket"
+        inames[24] = "inet_addr"
+        inames[25] = "htons"
+        inames[26] = "bind"
+        inames[27] = "listen"
+        inames[28] = "accept"
+        inames[29] = "connect"
+        inames[30] = "send"
+        inames[31] = "recv"
+        inames[32] = "closesocket"
+        inames[33] = "WSAGetLastError"
+        inames[34] = "GetDC"
+        inames[35] = "ReleaseDC"
+        inames[36] = "GetSystemMetrics"
+        inames[37] = "SetCursorPos"
+        inames[38] = "mouse_event"
+        inames[39] = "keybd_event"
+        inames[40] = "VkKeyScanA"
+        inames[41] = "GetCursorPos"
+        inames[42] = "CreateCompatibleDC"
+        inames[43] = "CreateCompatibleBitmap"
+        inames[44] = "SelectObject"
+        inames[45] = "BitBlt"
+        inames[46] = "GetDIBits"
+        inames[47] = "DeleteDC"
+        inames[48] = "DeleteObject"
     }
 
     def peek[o: Int] -> Int {
@@ -693,15 +702,81 @@ actor Main {
         }
     }
 
+    # ================= CLI =================
+    # 取下一个参数（支持双引号包裹；无更多参数返回 ""）
+    def nextArg -> Str {
+        n: Int = strLen(argLine)
+        p: Ptr = strPtr(argLine)
+        i: Int = argPos
+        while i < n and load8(ptrAdd(p, i)) == 32 { i = i + 1 }
+        buf: Ptr = alloc(1024)
+        j: Int = 0
+        q: Int = 0
+        if i < n and load8(ptrAdd(p, i)) == 34 {
+            q = 1
+            i = i + 1
+        }
+        done: Int = 0
+        while i < n and done == 0 {
+            c: Int = load8(ptrAdd(p, i))
+            if q == 1 {
+                if c == 34 {
+                    done = 1
+                    i = i + 1
+                } else {
+                    store8(ptrAdd(buf, j), c)
+                    j = j + 1
+                    i = i + 1
+                }
+            } else {
+                if c == 32 {
+                    done = 1
+                } else {
+                    store8(ptrAdd(buf, j), c)
+                    j = j + 1
+                    i = i + 1
+                }
+            }
+        }
+        store8(ptrAdd(buf, j), 0)
+        argPos = i
+        return ptrToStr(buf)
+    }
+
+    # 用法: wkcc <输入.wk> [输出.exe]；无参数 = 旧默认（build/lex_input.txt -> build/selfhost.exe）
+    def parseCli {
+        argLine = cmdline()
+        argPos = 0
+        skipArg()                       # 程序名
+        a1: Str = nextArg()
+        if strLen(a1) > 0 {
+            inPath = a1
+            a2: Str = nextArg()
+            if strLen(a2) > 0 {
+                outPath = a2
+            }
+            a3: Str = nextArg()
+            if strLen(a3) > 0 {
+                blobPath = a3
+            }
+        }
+        print("[wkcc] 编译 ", inPath, " -> ", outPath)
+    }
+
+    def skipArg {
+        a0: Str = nextArg()
+    }
+
     # ================= 入口 =================
     def main {
         setup()
-        n: Int = loadSrc("build/lex_input.txt")
+        parseCli()
+        n: Int = loadSrc(inPath)
         if n < 0 { print("read fail"); return }
 
         # 读运行时 blob
         blob = alloc(RT_DATA_OFF + RT_DATA_LEN + 16)
-        readBytes("build/rt_blob.bin", blob, RT_DATA_OFF + RT_DATA_LEN)
+        readBytes(blobPath, blob, RT_DATA_OFF + RT_DATA_LEN)
 
         # 分配用户代码区（256KB）和 .rdata 区（256KB）
         # 依据：.text 窗口守卫限定 cw<=128KB，exe 总大小 <= ~180KB，256KB 有确定富余
@@ -930,11 +1005,18 @@ actor Main {
         fi4: Int = 0
         while fi4 < fldCount {
             if fldArrN[fi4] == 0 {
-                e8(72); e8(199); e8(135)  # mov qword [rdi+disp32], imm32（48 C7 87）
-                e32(fldOff[fi4])
-                v4: Int = 0
-                if fldHasInit[fi4] == 1 { v4 = fldInitVal[fi4] }
-                e32(v4)
+                if fldTy[fi4] == "Str" and fldHasInit[fi4] == 1 {
+                    # 字符串字段初值是字面量：必须 RIP 相对 LEA（存的是运行期地址，
+                    # 直接写 RVA 数值会得到不可解引用的偏移——2026-11-03 修复）
+                    eLeaRcv(2, fldInitVal[fi4])          # lea rdx, [rip+disp32]
+                    e8(72); e8(137); e8(151); e32(fldOff[fi4])   # mov [rdi+off32], rdx（48 89 97）
+                } else {
+                    e8(72); e8(199); e8(135)  # mov qword [rdi+disp32], imm32（48 C7 87）
+                    e32(fldOff[fi4])
+                    v4: Int = 0
+                    if fldHasInit[fi4] == 1 { v4 = fldInitVal[fi4] }
+                    e32(v4)
+                }
             }
             fi4 = fi4 + 1
         }
@@ -2022,6 +2104,10 @@ actor Main {
                     ePopArgs(nargs, 0)
                     eCallRt(OFF_PROC_FREE); lastTy = "Int"; return
                 }
+                if name == "cmdline" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_CMDLINE); lastTy = "Str"; return
+                }
                 # ---- agent 原语（EonOS）----
                 if name == "screenW" {
                     ePopArgs(nargs, 0)
@@ -2214,7 +2300,7 @@ actor Main {
         setupNames()
         # ---- 1) 读运行时 blob ----
         blob = alloc(RT_DATA_OFF + RT_DATA_LEN + 16)
-        got: Int = readBytes("build/rt_blob.bin", blob, RT_DATA_OFF + RT_DATA_LEN)
+        got: Int = readBytes(blobPath, blob, RT_DATA_OFF + RT_DATA_LEN)
 
         # ---- 2) 布局计算 ----
         # .text = blob text (3086) + 填充到 4096 + 用户代码 (cw)
@@ -2426,8 +2512,8 @@ actor Main {
         putZeros(dataRaw - RT_DATA_LEN)
 
         # ---- 11) 写文件 ----
-        wrote: Int = writeBytes("build/selfhost.exe", out, fileSize)
-        print("selfhost.exe 写出 = ", wrote, " 字节")
+        wrote: Int = writeBytes(outPath, out, fileSize)
+        print(outPath, " 写出 = ", wrote, " 字节")
     }
 
     # ---- PE 写出帮助函数 ----

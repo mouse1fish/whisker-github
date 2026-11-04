@@ -12,8 +12,9 @@
 - 📜 **设计原则（宪法）**：四条原则 + 不做的事清单，见 [`交接文档-自举完成.md`](./交接文档-自举完成.md) 第 11 节
 - 🗓️ 当前进度、踩坑记录与断点：见 [`进度.md`](./进度.md)
 - 📚 **语言教程**（安装→入门→语法→内置函数→排障）：见 [`教程.md`](./教程.md)
-- 📦 **便携 SDK**（解压任意目录即用）：见 [`sdk/whisker-sdk/`](./sdk/whisker-sdk/)，分发 zip 为 [`sdk/whisker-sdk-2026-10-28.zip`](./sdk/whisker-sdk-2026-10-28.zip)
-- 🏆 **自举已完成**（编译器用自己写、自己编译、**产物与自身逐字节一致**）：见 [`交接文档-自举完成.md`](./交接文档-自举完成.md)；日常构建用 `tools/selfbuild.ps1`（Windows 原生，无需 Python），`tools/selfbuild.sh` 等价（Git Bash）
+- 📦 **便携 SDK**（解压任意目录即用）：见 [`sdk/whisker-sdk/`](./sdk/whisker-sdk/)，分发 zip 为 [`sdk/whisker-sdk-2026-11-03.zip`](./sdk/whisker-sdk-2026-11-03.zip)
+- 🏆 **自举已完成**（编译器用自己写、自己编译、**产物与自身逐字节一致**）：见 [`交接文档-自举完成.md`](./交接文档-自举完成.md)；日常构建用 `tools/selfbuild.ps1`（Windows 原生，无需 Python）；
+  编译器已支持 CLI：`build\wkcc2.exe 源.wk [输出.exe]`
 
 ```
 actor Counter {

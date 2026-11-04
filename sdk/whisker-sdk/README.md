@@ -1,4 +1,4 @@
-# Whisker SDK
+# Whisker SDK（2026-11-03）
 
 Whisker 语言工具链的便携分发包。**解压到任何目录即可用**，不写注册表、不依赖环境变量、无需管理员权限。
 
@@ -8,7 +8,7 @@ Whisker 语言工具链的便携分发包。**解压到任何目录即可用**�
 whisker-sdk/
 ├── bin/wkcc2.exe      自举编译器（Whisker 语言写成，编译 .wk → Windows x64 exe）
 ├── share/rt_blob.bin  运行时机器码 blob（编译必需，编译器自动拼接进产物）
-├── examples/          示例源码（hello / syntax / elif / def / decl）
+├── examples/          示例源码（hello / syntax / elif / def / decl / builtins_demo）
 ├── whisker            POSIX sh 包装器（Git Bash / MSYS / Cygwin / WSL 调用）
 └── whisker.cmd        Windows cmd 包装器
 ```
@@ -28,6 +28,9 @@ whisker compile hello.wk myapp.exe
 
 # 编译产物是独立 exe，直接运行
 ./hello.exe
+
+# 也可是直接调用编译器（CLI）：
+bin/wkcc2.exe hello.wk out.exe share/rt_blob.bin
 
 # 查看版本
 whisker version

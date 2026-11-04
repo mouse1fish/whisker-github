@@ -50,6 +50,7 @@ BUILTIN_SIGS: dict[str, tuple[list[Ty], Ty]] = {
     "procRead": ([PTR_TY, PTR_TY, INT_TY], INT_TY),     # 读子进程输出（0=EOF/-1）
     "procWait": ([PTR_TY], INT_TY),                     # 等待退出 -> 退出码/-1
     "procFree": ([PTR_TY], VOID_TY),                    # 关闭进程块里的句柄
+    "cmdline": ([], STR_TY),                            # 完整命令行（ANSI 字符串）
     # ---- agent 原语（EonOS：屏幕/鼠标/键盘）----
     "screenW": ([], INT_TY),                            # 屏幕宽
     "screenH": ([], INT_TY),                            # 屏幕高

@@ -1,0 +1,6 @@
+[cli] 1 entered
+[cli] 2 line="G:\trea-Eon-os\trea-xiancheng-bianyiqi\build\wkcc2.exe" build\t_strfield.wk build\t_strfield.exe 
+[cli] 3 prog=G:\trea-Eon-os\trea-xiancheng-bianyiqi\build\wkcc2.exe
+[cli] 4 a1=[build\t_strfield.wk]
+[wkcc] 编译 build\t_strfield.wk -> build\t_strfield.exe
+build\t_strfield.exe 写出 = 30720 字节

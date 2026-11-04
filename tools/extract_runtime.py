@@ -150,6 +150,7 @@ def main() -> int:
         "rt_proc_spawn": "OFF_PROC_SPAWN", "rt_proc_spawn_n": "OFF_PROC_SPAWN_N",
         "rt_proc_read": "OFF_PROC_READ", "rt_proc_wait": "OFF_PROC_WAIT",
         "rt_proc_free": "OFF_PROC_FREE",
+        "rt_cmdline": "OFF_CMDLINE",
         "rt_screen_w": "OFF_SCREEN_W", "rt_screen_h": "OFF_SCREEN_H",
         "rt_mouse_x": "OFF_MOUSE_X", "rt_mouse_y": "OFF_MOUSE_Y",
         "rt_mouse_move": "OFF_MOUSE_MOVE", "rt_mouse_down": "OFF_MOUSE_DOWN",

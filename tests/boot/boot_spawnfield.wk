@@ -1,0 +1,12 @@
+# spawn 的 actor 字段初始化
+actor Counter {
+    port: Int = 47231
+    on Report { print("port=", port) }
+}
+actor Main {
+    c: ActorRef[Counter]
+    on Start {
+        c = spawn Counter
+        c.send(Report())
+    }
+}

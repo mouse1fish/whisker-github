@@ -1,0 +1,12 @@
+# 局部数组读写
+actor Main {
+    on Start {
+        arr: Int[4]
+        i: Int = 0
+        while i < 4 {
+            arr[i] = i * i
+            i = i + 1
+        }
+        print(arr[0], "-", arr[3])
+    }
+}

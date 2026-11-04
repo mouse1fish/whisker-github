@@ -1,0 +1,10 @@
+# ptrToInt / intToPtr
+actor Main {
+    on Start {
+        p: Ptr = alloc(16)
+        store8(p, 65)
+        i: Int = ptrToInt(p)
+        q: Ptr = intToPtr(i)
+        if load8(q) == 65 { print("cast ok") }
+    }
+}

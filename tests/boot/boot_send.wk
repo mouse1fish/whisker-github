@@ -1,0 +1,15 @@
+# 跨 actor 消息发送
+actor Ping {
+    total: Int = 0
+    on Add[n: Int] {
+        total = total + n
+        print("pong ", total)
+    }
+}
+actor Main {
+    p: ActorRef[Ping]
+    on Start {
+        p = spawn Ping
+        p.send(Add(42))
+    }
+}
