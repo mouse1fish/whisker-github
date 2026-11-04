@@ -1,0 +1,2 @@
+server 已监听 47231
+client connect 失败 err=0

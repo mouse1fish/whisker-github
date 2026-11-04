@@ -1,0 +1,6 @@
+actor Main {
+    src: Ptr
+    on Start {
+        print(1)
+    }
+}

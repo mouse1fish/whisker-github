@@ -1,0 +1,4 @@
+
+actor Main {
+    on Start { print("a=", 1, "b=", 2); }
+}

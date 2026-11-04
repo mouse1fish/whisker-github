@@ -1,0 +1,5 @@
+def parseUnary {
+        if tIsPunc("-") { tAdvance(); parseUnary(); e8(72); e8(247); e8(216); return }  # neg rax
+        if tIsPunc("!") or tIsKw("not") {
+            tAdvance()
+            parseUna

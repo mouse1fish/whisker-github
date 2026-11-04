@@ -1,0 +1,14 @@
+﻿actor Main {
+    on Start {
+        p: Ptr = procSpawnPipe("cmd.exe /c echo HI")
+        buf: Ptr = alloc(64)
+        print("块前 hProcess=", load64(p), " hPipe=", load64(ptrAdd(p, 8)))
+        n1: Int = procRead(p, buf, 63)
+        print("读1=", n1, " 块中 hProcess=", load64(p), " hPipe=", load64(ptrAdd(p, 8)))
+        n2: Int = procRead(p, ptrAdd(buf, n1), 60)
+        print("读2=", n2, " 块后 hProcess=", load64(p), " hPipe=", load64(ptrAdd(p, 8)))
+        c: Int = procWait(p)
+        print("退出码=", c)
+        print("完成")
+    }
+}

@@ -1,0 +1,22 @@
+resolveFnFx()
+        print("[dbg7] resolveFx ok, nfix=", intToStr(fxCount))
+        i2: Int = 0
+        while i2 < fldCount {
+            print("[fld] ", fldName[i2], " ", intToStr(fldOff[i2]))
+            i2 = i2 + 1
+        }
+
+        # ---- 写 PE ----
+        buildPe()
+        print("[dbg8] buildPe done")
+    }
+
+    def parseProgram {
+        tSkipNl()
+        n: Int = 0
+        while pk(0) != K_EOF {
+            if tIsKw("actor") {
+                parseActor()
+                n = n + 1
+            } else {
+    

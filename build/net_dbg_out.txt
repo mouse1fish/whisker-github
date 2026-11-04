@@ -1,0 +1,8 @@
+netInit=0
+listen=452
+connect=456 err=0
+accept=460
+send=4 err=0
+recv=4
+内容=ping
+完成

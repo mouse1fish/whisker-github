@@ -1,0 +1,73 @@
+# net_dbg2.wk —— 自举链路诊断：spawn/字段/消息派发逐步打点
+actor Server {
+    cli: ActorRef[Client]
+    port: Int = 47231
+
+    on SetClient[c: ActorRef[Client]] {
+        cli = c
+        print("S: SetClient 完成")
+    }
+
+    on Listen {
+        print("S: Listen 开始 port=", port)
+        netInit()
+        ls: Int = netListen(port)
+        print("S: ls=", ls)
+        if ls < 0 {
+            print("S: listen 失败")
+        } else {
+            cli.send(Listening(ls))
+            print("S: 等待 accept")
+            cs: Int = netAccept(ls)
+            print("S: accept=", cs)
+            if cs >= 0 {
+                b: Ptr = alloc(256)
+                n: Int = netRecv(cs, b, 255)
+                print("S: 收到 ", n, " 字节")
+                netSend(cs, b, n)
+                netClose(cs)
+            }
+            netClose(ls)
+        }
+    }
+}
+
+actor Client {
+    port: Int = 47231
+
+    on Listening[ls: Int] {
+        print("C: 收到 Listening ", ls)
+        s: Int = netConnect("127.0.0.1", port)
+        print("C: connect=", s)
+        if s >= 0 {
+            msg: Str = "hello-whisker-net"
+            n: Int = netSend(s, strPtr(msg), strLen(msg))
+            print("C: 发送 ", n, " 字节")
+            b: Ptr = alloc(256)
+            r: Int = netRecv(s, b, 255)
+            print("C: 收到 ", r, " 字节")
+            if r > 0 {
+                store8(ptrAdd(b, r), 0)
+                print("C: 回显=", ptrToStr(b))
+            }
+            netClose(s)
+        }
+    }
+}
+
+actor Main {
+    srv: ActorRef[Server]
+    cli: ActorRef[Client]
+
+    on Start {
+        print("M: start")
+        srv = spawn Server
+        print("M: spawn Server 完成")
+        cli = spawn Client
+        print("M: spawn Client 完成")
+        srv.send(SetClient(cli))
+        print("M: SetClient 已发")
+        srv.send(Listen())
+        print("M: Listen 已发")
+    }
+}

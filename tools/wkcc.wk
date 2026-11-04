@@ -1,4 +1,4 @@
-# wkcc —— 用 Whisker 写的 Whisker 编译器（自举第 9 步：一遍式代码发射）
+﻿# wkcc —— 用 Whisker 写的 Whisker 编译器（自举第 9 步：一遍式代码发射）
 # 读取 build\lex_input.txt（.wk 源码），产出 build\selfhost.exe
 # 语法导向翻译：边解析边发射机器码，不需要真的建 AST 树。
 
@@ -22,50 +22,85 @@ actor Main {
     K_PUNC: Int = 4
     K_NL: Int = 5
     K_EOF: Int = 6
+    # ---- 运行时 blob 布局常量（由 tools/extract_runtime.py 输出同步，2026-10-28 系统原语版）----
+    # 改动运行时（whiskerc/runtime_x64.py）后必须重跑 extract_runtime.py 并同步本块 + buildPe 导入表
     OFF_RT_INIT: Int = 44
-    OFF_ACTOR_NEW: Int = 632
-    OFF_SEND: Int = 670
-    OFF_RUN: Int = 1294
-    OFF_PBEGIN: Int = 1399
-    OFF_PRINT_INT: Int = 1569
-    OFF_PRINT_END: Int = 1807
-    OFF_PCSTR: Int = 1500
-    OFF_PBOOL: Int = 1739
-    OFF_PSTR: Int = 1437
-    OFF_ALLOC: Int = 404
-    OFF_STR_CAT: Int = 2352
-    OFF_STR_LEN: Int = 2300
-    OFF_INT_TO_STR: Int = 2491
-    OFF_STR_TO_INT: Int = 2799
-    OFF_COPY: Int = 2916
-    OFF_READ_BYTES: Int = 1977
-    OFF_WRITE_BYTES: Int = 2140
-    OFF_ZERO: Int = 1897
-    OFF_BOUNDS_FAIL: Int = 1931
-    OFF_STR_EQ: Int = 3014
-    OFF_NOW_MS: Int = 2948
-    RT_TEXT_LEN: Int = 3086
-    RT_RDATA_LEN: Int = 482
-    RT_DATA_LEN: Int = 17280
-    RT_DATA_OFF: Int = 3568
-    RDATA_RVA: Int = 69632
-    DATA_RVA: Int = 135168
-    IMAGE_SIZE: Int = 200704
-    IAT_RVA: Int = 152320
-    IAT_IN_DATA: Int = 17152
-    NIMPORT: Int = 15
-    USER_OFF: Int = 4096
+    OFF_ACTOR_NEW: Int = 640
+    OFF_SEND: Int = 682
+    OFF_RUN: Int = 1314
+    OFF_PBEGIN: Int = 1588
+    OFF_PRINT_INT: Int = 1770
+    OFF_PRINT_END: Int = 2016
+    OFF_PCSTR: Int = 1697
+    OFF_PBOOL: Int = 1944
+    OFF_PSTR: Int = 1630
+    OFF_ALLOC: Int = 408
+    OFF_STR_CAT: Int = 2591
+    OFF_STR_LEN: Int = 2535
+    OFF_INT_TO_STR: Int = 2734
+    OFF_STR_TO_INT: Int = 3046
+    OFF_COPY: Int = 3167
+    OFF_READ_BYTES: Int = 2204
+    OFF_WRITE_BYTES: Int = 2371
+    OFF_ZERO: Int = 2110
+    OFF_BOUNDS_FAIL: Int = 2144
+    OFF_STR_EQ: Int = 3273
+    OFF_NOW_MS: Int = 3203
+    # ---- 系统原语（EonOS 地基）：睡眠/墙钟/TCP/进程 ----
+    OFF_SLEEP_MS: Int = 3349
+    OFF_WALL_MS: Int = 3375
+    OFF_NET_INIT: Int = 3401
+    OFF_NET_ERR: Int = 3465
+    OFF_NET_LISTEN: Int = 3642
+    OFF_NET_LISTEN_L: Int = 3838
+    OFF_NET_ACCEPT: Int = 4047
+    OFF_NET_CONNECT: Int = 4079
+    OFF_NET_SEND: Int = 4241
+    OFF_NET_RECV: Int = 4273
+    OFF_NET_CLOSE: Int = 4305
+    OFF_PROC_SPAWN: Int = 4334        # (cmd, capture) 通用版
+    OFF_PROC_SPAWN_N: Int = 4825      # (cmd) 无管道包装
+    OFF_PROC_READ: Int = 4833
+    OFF_PROC_WAIT: Int = 4947
+    OFF_PROC_FREE: Int = 5036
+    # ---- agent 原语（EonOS：屏幕/鼠标/键盘）----
+    OFF_SCREEN_W: Int = 5107
+    OFF_SCREEN_H: Int = 5139
+    OFF_MOUSE_X: Int = 5175
+    OFF_MOUSE_Y: Int = 5240
+    OFF_MOUSE_MOVE: Int = 5306
+    OFF_MOUSE_DOWN: Int = 5335
+    OFF_MOUSE_UP: Int = 5443
+    OFF_KEY_DOWN: Int = 5555
+    OFF_KEY_UP: Int = 5593
+    OFF_KEY_VK: Int = 5635
+    OFF_SCREENSHOT: Int = 5668
+    RT_TEXT_LEN: Int = 6222
+    RT_RDATA_LEN: Int = 1357
+    RT_DATA_LEN: Int = 18160
+    RT_DATA_OFF: Int = 7579            # blob bin 内 data 段起点 = RT_TEXT_LEN + RT_RDATA_LEN
+    RDATA_RVA: Int = 135168            # 0x21000（.text 预留 0x20000 = 128KB 给用户代码）
+    DATA_RVA: Int = 200704             # 0x31000
+    IMAGE_SIZE: Int = 221184           # 0x36000
+    IAT_RVA: Int = 218472              # 0x35530 = DATA_RVA + IAT_IN_DATA
+    IAT_IN_DATA: Int = 17768
+    NIMPORT: Int = 48
+    NIMP_KERNEL32: Int = 21
+    NIMP_WS2: Int = 12
+    NIMP_USER32: Int = 8
+    NIMP_GDI32: Int = 7
+    USER_OFF: Int = 8192
 
 
     # ================= 代码发射缓冲 =================
     cbuf: Ptr                  # 用户代码区（64KB，.text 里 blob 之后）
     cw: Int = 0                # 用户代码写偏移
-    USER_RVA: Int = 8192       # 0x2000 = TEXT_RVA + USER_OFF：用户代码区起始 RVA（.text 内 blob 之后）
+    USER_RVA: Int = 12288      # 0x3000 = TEXT_RVA + USER_OFF：用户代码区起始 RVA（.text 内 blob 之后，blob text 4715B）
     entryPos: Int = 0          # entry 代码在用户代码区内的偏移（所有 actor 之后发射）
     TEXT_RVA: Int = 4096       # 0x1000
 
     # ================= .rdata 字符串区 =================
-    rbuf: Ptr                  # .rdata 区（64KB）
+    rbuf: Ptr                  # .rdata 区（256KB）
     rw: Int = 0                # .rdata 写偏移（从 blob rdata 之后开始 = 482 + impSize）
     rdataStrBase: Int = 0      # 字符串区的起始 .rdata 偏移
 
@@ -84,6 +119,7 @@ actor Main {
     actName: Str[64]
     actSize: Int[64]
     actDisp: Int[64]
+    aInit: Int[64]         # 各 actor 的字段初始化块位置（spawn 与 entry 共用）
     actCount: Int = 0
     fldName: Str[256]
     fldOff: Int[256]
@@ -101,8 +137,8 @@ actor Main {
     blob: Ptr
     out: Ptr
     w: Int = 0
-    hintRVA: Int[16]
-    inames: Str[16]
+    hintRVA: Int[64]
+    inames: Str[64]
     # ---- 局部变量表（函数级扁平，同名复用槽）----
     localName: Str[256]
     localDisp: Int[256]     # [rbp + disp]（disp 为负）
@@ -113,8 +149,20 @@ actor Main {
     curSubSite: Int = 0     # 当前函数 sub rsp,imm32 的立即数位点（cw），parseBlock 后回填
     fldTy: Str[256]         # 字段类型
     fldArrN: Int[256]       # 字段数组大小（0=标量）
+    fldRef: Str[256]        # ActorRef 字段的目标 actor 类型
+    localRef: Str[256]      # ActorRef 局部/参数的目标 actor 类型
+    ghActor: Str[256]       # 全局 handler 注册表：(actor, msg) -> tag（send 的 tag 解析用）
+    ghMsg: Str[256]
+    ghTag: Int[256]
+    ghCount: Int = 0
+    sndSite: Int[1024]     # send 的 tag 占位点（imm32 位置），解析完所有 actor 后回填
+    sndRef: Str[1024]      # send 目标 actor 名
+    sndMsg: Str[1024]      # send 消息名
+    sndCount: Int = 0
     fnRetTy: Str[128]        # def 返回类型
     lastTy: Str = "Int"     # 最近一次表达式求值的类型（判 Str== 用）
+    lastRefTy: Str = ""     # 最近一次 ActorRef 表达式的目标 actor 名（send 的 tag 解析用）
+    pendingRef: Str = ""    # localSlot 调用前设置：ActorRef 局部/参数的目标类型（def 最多 3 参的绕行）
     forSeq: Int = 0         # for 隐藏上限槽计数
     seqName: Str[16]        # 隐藏槽名字池
     curRetTy: Str = "Int"   # 当前函数返回类型
@@ -131,6 +179,8 @@ actor Main {
     ufCount: Int = 0
 
     def setupNames {
+        # 顺序必须与 whiskerc/runtime_x64.py 的 IMPORTS + WS2_IMPORTS 扁平顺序完全一致
+        # （wkcc 用 blob 的 IAT 槽位，槽位序 = 这里登记的序）
         inames[0] = "GetStdHandle"
         inames[1] = "WriteFile"
         inames[2] = "VirtualAlloc"
@@ -140,12 +190,45 @@ actor Main {
         inames[6] = "GetSystemInfo"
         inames[7] = "Sleep"
         inames[8] = "ExitProcess"
-        inames[9] = "CreateEventA"
-        inames[10] = "SetEvent"
-        inames[11] = "WaitForSingleObject"
-        inames[12] = "CreateFileA"
-        inames[13] = "ReadFile"
-        inames[14] = "CloseHandle"
+        inames[9] = "TerminateProcess"
+        inames[10] = "CreateEventA"
+        inames[11] = "SetEvent"
+        inames[12] = "WaitForSingleObject"
+        inames[13] = "CreateFileA"
+        inames[14] = "ReadFile"
+        inames[15] = "CloseHandle"
+        inames[16] = "GetTickCount64"
+        inames[17] = "CreateProcessA"
+        inames[18] = "GetExitCodeProcess"
+        inames[19] = "CreatePipe"
+        inames[20] = "SetHandleInformation"
+        inames[21] = "WSAStartup"
+        inames[22] = "socket"
+        inames[23] = "inet_addr"
+        inames[24] = "htons"
+        inames[25] = "bind"
+        inames[26] = "listen"
+        inames[27] = "accept"
+        inames[28] = "connect"
+        inames[29] = "send"
+        inames[30] = "recv"
+        inames[31] = "closesocket"
+        inames[32] = "WSAGetLastError"
+        inames[33] = "GetDC"
+        inames[34] = "ReleaseDC"
+        inames[35] = "GetSystemMetrics"
+        inames[36] = "SetCursorPos"
+        inames[37] = "mouse_event"
+        inames[38] = "keybd_event"
+        inames[39] = "VkKeyScanA"
+        inames[40] = "GetCursorPos"
+        inames[41] = "CreateCompatibleDC"
+        inames[42] = "CreateCompatibleBitmap"
+        inames[43] = "SelectObject"
+        inames[44] = "BitBlt"
+        inames[45] = "GetDIBits"
+        inames[46] = "DeleteDC"
+        inames[47] = "DeleteObject"
     }
 
     # ================= 词法（与之前版本相同） =================
@@ -211,12 +294,45 @@ actor Main {
         inames[6] = "GetSystemInfo"
         inames[7] = "Sleep"
         inames[8] = "ExitProcess"
-        inames[9] = "CreateEventA"
-        inames[10] = "SetEvent"
-        inames[11] = "WaitForSingleObject"
-        inames[12] = "CreateFileA"
-        inames[13] = "ReadFile"
-        inames[14] = "CloseHandle"
+        inames[9] = "TerminateProcess"
+        inames[10] = "CreateEventA"
+        inames[11] = "SetEvent"
+        inames[12] = "WaitForSingleObject"
+        inames[13] = "CreateFileA"
+        inames[14] = "ReadFile"
+        inames[15] = "CloseHandle"
+        inames[16] = "GetTickCount64"
+        inames[17] = "CreateProcessA"
+        inames[18] = "GetExitCodeProcess"
+        inames[19] = "CreatePipe"
+        inames[20] = "SetHandleInformation"
+        inames[21] = "WSAStartup"
+        inames[22] = "socket"
+        inames[23] = "inet_addr"
+        inames[24] = "htons"
+        inames[25] = "bind"
+        inames[26] = "listen"
+        inames[27] = "accept"
+        inames[28] = "connect"
+        inames[29] = "send"
+        inames[30] = "recv"
+        inames[31] = "closesocket"
+        inames[32] = "WSAGetLastError"
+        inames[33] = "GetDC"
+        inames[34] = "ReleaseDC"
+        inames[35] = "GetSystemMetrics"
+        inames[36] = "SetCursorPos"
+        inames[37] = "mouse_event"
+        inames[38] = "keybd_event"
+        inames[39] = "VkKeyScanA"
+        inames[40] = "GetCursorPos"
+        inames[41] = "CreateCompatibleDC"
+        inames[42] = "CreateCompatibleBitmap"
+        inames[43] = "SelectObject"
+        inames[44] = "BitBlt"
+        inames[45] = "GetDIBits"
+        inames[46] = "DeleteDC"
+        inames[47] = "DeleteObject"
     }
 
     def peek[o: Int] -> Int {
@@ -587,24 +703,21 @@ actor Main {
         blob = alloc(RT_DATA_OFF + RT_DATA_LEN + 16)
         readBytes("build/rt_blob.bin", blob, RT_DATA_OFF + RT_DATA_LEN)
 
-        # 分配用户代码区（64KB）和 .rdata 区（64KB）
-        cbuf = alloc(65536)
-        rbuf = alloc(65536)
+        # 分配用户代码区（256KB）和 .rdata 区（256KB）
+        # 依据：.text 窗口守卫限定 cw<=128KB，exe 总大小 <= ~180KB，256KB 有确定富余
+        # （历史教训：64KB 容器在 wkcc 自身体积超过 64KB 后溢出，踩坏紧邻的 rbuf 字符串池）
+        cbuf = alloc(262144)
+        rbuf = alloc(262144)
 
-        # .rdata 布局：blob rdata (482B) + 导入表结构 + 字符串区
-        # 导入结构大小：idesc 40 + ILT 8*16 + dllname 13 + hints（动态计算）
-        impSize = 40 + 8 * (NIMPORT + 1) + 13
-        i: Int = 0
-        while i < NIMPORT {
-            impSize = impSize + 2 + strLen(inames[i]) + 1
-            i = i + 1
-        }
+        # .rdata 布局：blob rdata + 导入表结构（双 DLL）+ 字符串区
+        calcImpSize()
         rdataStrBase = RT_RDATA_LEN + impSize
 
         lex()
         parseProgram()
         resolveFx()
         resolveFnFx()
+        resolveSndTags()
 
         # ---- 写 PE ----
         buildPe()
@@ -626,8 +739,16 @@ actor Main {
         # ==== entry 发射（所有 actor 之后）====
         # and rsp, -16：入口 RSP≡8（call 约定），ABI 要求 call 前 RSP≡0。
         # entry 不会返回（直接 TerminateProcess），可以自由重对齐。
-        mainDisp: Int = actDisp[0]
-        mainSize: Int = actSize[0]
+        # 入口 actor 固定叫 Main（与 Python 侧 sema.ENTRY_ACTOR 一致），
+        # 不能假设它是第一个注册的 actor——多 actor 程序里 actDisp[0] 可能是别的。
+        mainIdx: Int = 0
+        mi: Int = 0
+        while mi < actCount {
+            if actName[mi] == "Main" { mainIdx = mi }
+            mi = mi + 1
+        }
+        mainDisp: Int = actDisp[mainIdx]
+        mainSize: Int = actSize[mainIdx]
         entryPos = cw
         # and rsp, -16（48 83 E4 F0）：入口 RSP≡8，ABI 要求 call 前 RSP≡0；
         # entry 不返回（TerminateProcess 结束），可自由重对齐
@@ -644,18 +765,8 @@ actor Main {
         eCallRt(OFF_ACTOR_NEW)
         # 保存 actor 指针到 rbx
         e8(72); e8(137); e8(195)          # mov rbx, rax（暂存 actor ptr）
-        # ---- Main 标量字段初始化：mov qword [rbx+off32], imm32（48 C7 83）----
-        fw: Int = 0
-        while fw < fldCount {
-            if fldArrN[fw] == 0 {
-                e8(72); e8(199); e8(131)
-                e32(fldOff[fw])
-                v2: Int = 0
-                if fldHasInit[fw] == 1 { v2 = fldInitVal[fw] }
-                e32(v2)
-            }
-            fw = fw + 1
-        }
+        # ---- Main 字段初始化：调 INIT_Main 块（rax 进 rax 出，rbx 不受影响）----
+        eCallUser(aInit[mainIdx])
         # 分配信封（16 字节 = tag + link）
         e8(72); e8(199); e8(193); e32(16) # mov rcx, 16
         eCallRt(OFF_ALLOC)                # rax = envelope
@@ -739,7 +850,8 @@ actor Main {
         actName[actCount] = name
         fldCount = 0
         hCount = 0
-        fnCount = 0
+        # 注意：fnCount 不在此重置——def 表是全局的（前向引用/resolveFnFx 在 EOF 统一解析），
+        # 因此跨 actor 的 def 名必须全局唯一（与 Python 侧的 actor 内作用域不同，已知限制）
         actSize[actCount] = 48
         actCount = actCount + 1
         prescanFuncs()   # 预扫 def 签名（前向调用需要名字/参数/返回类型）
@@ -793,7 +905,7 @@ actor Main {
             # 从 payload 提取参数到 rdx/r8/r9（参数从 env+16 开始）
             np2: Int = hNParam[hi]
             if np2 > 0 {
-                e8(72); e8(139); e8(82); e32(16)          # mov rdx, [rax+16]
+                e8(72); e8(139); e8(80); e8(16)          # mov rdx, [rax+16]（48 8B 50 10，disp8）
             }
             if np2 > 1 {
                 e8(76); e8(139); e8(64); e8(24)          # mov r8, [rax+24] = 4C 8B 40 18
@@ -809,6 +921,26 @@ actor Main {
         # 清理栈：add rsp, 24（payload+self+对齐槽）→ 48 83 C4 18
         e8(72); e8(131); e8(196); e8(24)
         e8(195)                           # ret
+        # ==== 字段初始化块 INIT_<actor>（spawn 与 entry 共用）====
+        # 约定：RAX = 新 actor 指针，块内经 RDI 写字段，返回时 RAX 不变。
+        # 每个标量字段：mov qword [rdi+disp32], imm32（48 C7 87）
+        aInit[curActor] = cw
+        e8(85)                            # push rdi（55，RDI 是被调用者保存）
+        e8(72); e8(137); e8(199)          # mov rdi, rax（48 89 C7）
+        fi4: Int = 0
+        while fi4 < fldCount {
+            if fldArrN[fi4] == 0 {
+                e8(72); e8(199); e8(135)  # mov qword [rdi+disp32], imm32（48 C7 87）
+                e32(fldOff[fi4])
+                v4: Int = 0
+                if fldHasInit[fi4] == 1 { v4 = fldInitVal[fi4] }
+                e32(v4)
+            }
+            fi4 = fi4 + 1
+        }
+        e8(72); e8(137); e8(248)          # mov rax, rdi（48 89 F8）
+        e8(93)                            # pop rdi（5F）
+        e8(195)                           # ret（C3）
     }
 
     def parseField {
@@ -818,8 +950,10 @@ actor Main {
         ty: Str = pt(0)
         tAdvance()
         arrN: Int = 0
+        fref: Str = ""
         if ty == "ActorRef" {
             tExpect("[")
+            fref = pt(0)
             tAdvance()
             tExpect("]")
         } elif tIsPunc("[") {
@@ -860,6 +994,7 @@ actor Main {
         fldName[fldCount] = name
         fldTy[fldCount] = ty
         fldArrN[fldCount] = arrN
+        fldRef[fldCount] = fref
         fldOff[fldCount] = actSize[curActor]
         fldHasInit[fldCount] = hasInit
         fldInitVal[fldCount] = initV
@@ -882,6 +1017,7 @@ actor Main {
         # 序言：push rbp; mov rbp, rsp; sub rsp, imm32; push rbx; mov rbx, rcx
         e8(85)                            # push rbp
         e8(72); e8(137); e8(229)          # mov rbp, rsp
+        e8(72); e8(131); e8(228); e8(240) # and rsp, -16（动态对齐：容忍未对齐调用入口）
         e8(72); e8(129); e8(236)
         curSubSite = cw                   # 记录 imm32 位点，parseBlock 后按实际帧回填
         e32(4104)                         # sub rsp, 占位（4096+8；真实大小见 patchFrameSize）
@@ -895,6 +1031,41 @@ actor Main {
         hTag[hCount] = hCount + 1
         hNParam[hCount] = np
         hCount = hCount + 1
+        # 全局 handler 注册表（send 的 tag 解析用；tag = actor 内序号 + 1）
+        ghActor[ghCount] = actName[curActor]
+        ghMsg[ghCount] = name
+        ghTag[ghCount] = hCount
+        ghCount = ghCount + 1
+    }
+
+    # findTag(actorName, msgName) -> 该 actor 内此消息的 tag；未找到返回 -1
+    def findTag[an: Str, mn: Str] -> Int {
+        gi: Int = 0
+        while gi < ghCount {
+            if ghActor[gi] == an and ghMsg[gi] == mn {
+                return ghTag[gi]
+            }
+            gi = gi + 1
+        }
+        return 0 - 1
+    }
+
+    # 回填所有 send 的 tag（必须在所有 actor 解析完后调用）
+    def resolveSndTags {
+        si: Int = 0
+        while si < sndCount {
+            sTag: Int = findTag(sndRef[si], sndMsg[si])
+            if sTag < 0 {
+                err(strCat(strCat(sndRef[si], " 没有消息 "), sndMsg[si]))
+            }
+            u: Int = sTag
+            if u < 0 { u = u + 4294967296 }
+            store8(ptrAdd(cbuf, sndSite[si]), u % 256)
+            store8(ptrAdd(cbuf, sndSite[si] + 1), (u / 256) % 256)
+            store8(ptrAdd(cbuf, sndSite[si] + 2), (u / 65536) % 256)
+            store8(ptrAdd(cbuf, sndSite[si] + 3), (u / 16777216) % 256)
+            si = si + 1
+        }
     }
 
     def emitEpilogue {
@@ -912,7 +1083,7 @@ actor Main {
     # 尾声 pop rbx 弹出局部值（如字符串字节长 0x13）→ 调用方 self 被污染。
     def patchFrameSize {
         dmax: Int = 0 - localStackTop
-        s2: Int = ((dmax + 24) / 16) * 16 + 8
+        s2: Int = ((dmax + 47) / 16) * 16       # and rsp,-16 后 sub 量须 16 对齐（含对齐损耗余量）
         store8(ptrAdd(cbuf, curSubSite), s2 % 256)
         store8(ptrAdd(cbuf, curSubSite + 1), (s2 / 256) % 256)
         store8(ptrAdd(cbuf, curSubSite + 2), (s2 / 65536) % 256)
@@ -969,9 +1140,10 @@ actor Main {
             fnPos[fnCount] = cw
             fnCount = fnCount + 1
         }
-        # 序言：push rbp; mov rbp, rsp; sub rsp, imm32; push rbx; mov rbx, rcx
+        # 序言：push rbp; mov rbp, rsp; and rsp, -16; sub rsp, imm32; push rbx; mov rbx, rcx
         e8(85)
         e8(72); e8(137); e8(229)
+        e8(72); e8(131); e8(228); e8(240) # and rsp, -16（动态对齐：容忍未对齐调用入口）
         e8(72); e8(129); e8(236)
         curSubSite = cw                   # 记录 imm32 位点，parseBlock 后按实际帧回填
         e32(4104)
@@ -1030,6 +1202,8 @@ actor Main {
         localDisp[localCount] = d
         localTy[localCount] = ty
         localArrN[localCount] = arrN
+        localRef[localCount] = pendingRef
+        pendingRef = ""
         localCount = localCount + 1
         return d
     }
@@ -1047,8 +1221,10 @@ actor Main {
                     pty: Str = pt(0)
                     tAdvance()
                     pArrN: Int = 0
+                    pRef: Str = ""
                     if pty == "ActorRef" {
                         tExpect("[")
+                        pRef = pt(0)
                         tAdvance()
                         tExpect("]")
                     } elif tIsPunc("[") {
@@ -1057,6 +1233,7 @@ actor Main {
                         tAdvance()
                         tExpect("]")
                     }
+                    pendingRef = pRef
                     localSlot(pname, pty, pArrN)
                     n = n + 1
                     if tIsPunc(",") {
@@ -1133,6 +1310,7 @@ actor Main {
             tAdvance()
             tExpect("in")
             parseExpr()                        # 起点 a → rax
+            pendingRef = ""
             d: Int = localSlot(vname, "Int", 0)
             e8(72); e8(137); e8(133)           # mov [rbp+d], rax（先存 a，防被 b 覆盖）
             e32(d)
@@ -1142,6 +1320,7 @@ actor Main {
             # 隐藏上限槽（名字唯一，防嵌套 for 复用同名槽）
             lname: Str = strCat(".lim", intToStr(forSeq))
             forSeq = forSeq + 1
+            pendingRef = ""
             dl: Int = localSlot(lname, "Int", 0)
             e8(72); e8(137); e8(133)           # mov [rbp+dl], rax
             e32(dl)
@@ -1247,8 +1426,10 @@ actor Main {
             ty: Str = pt(0)
             tAdvance()
             arrN: Int = 0
+            dref: Str = ""
             if ty == "ActorRef" {
                 tExpect("[")
+                dref = pt(0)
                 tAdvance()
                 tExpect("]")
             } elif tIsPunc("[") {
@@ -1265,6 +1446,7 @@ actor Main {
             } elif arrN == 0 {
                 e8(72); e8(199); e8(192); e32(0)   # mov rax, 0（无初值标量置零）
             }
+            pendingRef = dref
             d: Int = localSlot(name, ty, arrN)
             if arrN == 0 {
                 e8(72); e8(137); e8(133)           # mov [rbp+d32], rax
@@ -1360,6 +1542,40 @@ actor Main {
     def parseBinLvl[level: Int] {
         if level >= 6 { parseUnary(); return }
         parseBinLvl(level + 1)
+        if level == 1 {
+            # and/&&：短路求值（左值为假 → 结果 0，右侧不求值——与 Python 侧语义一致）
+            while tIsKw("and") or tIsPunc("&&") {
+                tAdvance()
+                lbF: Int = newLb()
+                lbE: Int = newLb()
+                e8(72); e8(133); e8(192)      # test rax, rax
+                eJccFwd(4, lbF)               # je lbF
+                parseBinLvl(2)
+                eJmpFwd(lbE)
+                eMark(lbF)
+                e8(72); e8(199); e8(192); e32(0)   # mov rax, 0
+                eMark(lbE)
+                lastTy = "Int"
+            }
+            return
+        }
+        if level == 0 {
+            # or/||：短路求值（左值为真 → 结果 1，右侧不求值）
+            while tIsKw("or") or tIsPunc("||") {
+                tAdvance()
+                lbT: Int = newLb()
+                lbE: Int = newLb()
+                e8(72); e8(133); e8(192)      # test rax, rax
+                eJccFwd(5, lbT)               # jne lbT
+                parseBinLvl(1)
+                eJmpFwd(lbE)
+                eMark(lbT)
+                e8(72); e8(199); e8(192); e32(1)   # mov rax, 1
+                eMark(lbE)
+                lastTy = "Int"
+            }
+            return
+        }
         while isBinOpHere(level) {
             op: Str = pt(0)
             tAdvance()
@@ -1491,14 +1707,50 @@ actor Main {
                 msg: Str = pt(0)
                 tAdvance()
                 tExpect("(")
+                # ==== 消息发送：target.send(Msg(args)) ====
+                # 此刻 rax = target（actor ref），lastRefTy = 目标 actor 名。
+                # 信封布局：+0 tag、+8 link、+16 起参数（每参数 8 字节）。
+                sref: Str = lastRefTy
+                e8(80)                          # push rax（target）
+                sN: Int = 0
                 if tIsPunc(")") == False {
                     while True {
                         parseExpr()
+                        e8(80)                  # push rax（参数，最后压的在栈顶）
+                        sN = sN + 1
                         if tIsPunc(",") { tAdvance() } else { break }
                     }
                 }
                 tExpect(")")
                 tExpect(")")
+                # 分配信封：rcx = 16 + 8*参数数
+                e8(72); e8(199); e8(193)        # mov rcx, imm32（48 C7 C1）
+                e32(16 + 8 * sN)
+                eCallRt(OFF_ALLOC)              # rax = env
+                # 写 tag（tag 依赖全量 handler 表；跨 actor 前向引用 → 占位后回填）
+                e8(72); e8(199); e8(0)          # mov qword [rax], imm32（48 C7 00）
+                sndSite[sndCount] = cw
+                sndRef[sndCount] = sref
+                sndMsg[sndCount] = msg
+                sndCount = sndCount + 1
+                e32(0)
+                # link = 0
+                e8(72); e8(199); e8(64); e8(8)  # mov qword [rax+8], imm32（48 C7 40 08）
+                e32(0)
+                # 参数出栈写 env+16+8i（栈顶 = 最后一个参数）
+                pi2: Int = sN
+                while pi2 > 0 {
+                    e8(89)                      # pop rcx（59）
+                    e8(72); e8(137); e8(72)     # mov [rax+disp8], rcx（48 89 48 disp8）
+                    e8(16 + 8 * (pi2 - 1))
+                    pi2 = pi2 - 1
+                }
+                # target 出栈 → rcx；env → rdx；call rt_send
+                e8(89)                          # pop rcx（59）
+                e8(72); e8(137); e8(194)        # mov rdx, rax（48 89 C2）
+                eCallRt(OFF_SEND)
+                lastTy = "Int"
+                lastRefTy = ""
                 continue
             }
             break
@@ -1589,6 +1841,7 @@ actor Main {
                 tAdvance()
                 e8(72); e8(137); e8(216)   # mov rax, rbx（rbx = handler 序言保存的 self）
                 lastTy = "Ptr"
+                lastRefTy = actName[curActor]
                 return
             }
             if tIs("spawn") {
@@ -1603,10 +1856,12 @@ actor Main {
                         e32(USER_RVA + actDisp[ai] - (USER_RVA + cw + 4))
                         e8(72); e8(199); e8(194); e32(actSize[ai])
                         eCallRt(OFF_ACTOR_NEW)
+                        eCallUser(aInit[ai])   # 初始化新 actor 的字段（rax 进 rax 出）
                     }
                     ai = ai + 1
                 }
-                lastTy = "Ptr"
+                lastTy = "ActorRef"
+                lastRefTy = aname
                 return
             }
             err("表达式里出现意外的关键字")
@@ -1697,6 +1952,121 @@ actor Main {
                     ePopArgs(nargs, 0)
                     eCallRt(OFF_NOW_MS); lastTy = "Int"; return
                 }
+                # ---- 系统原语（EonOS 地基）----
+                if name == "sleepMs" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_SLEEP_MS); lastTy = "Int"; return
+                }
+                if name == "wallMs" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_WALL_MS); lastTy = "Int"; return
+                }
+                if name == "netInit" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_NET_INIT); lastTy = "Int"; return
+                }
+                if name == "netErr" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_NET_ERR); lastTy = "Int"; return
+                }
+                if name == "netListen" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_NET_LISTEN); lastTy = "Int"; return
+                }
+                if name == "netListenLocal" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_NET_LISTEN_L); lastTy = "Int"; return
+                }
+                if name == "netAccept" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_NET_ACCEPT); lastTy = "Int"; return
+                }
+                if name == "netConnect" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_NET_CONNECT); lastTy = "Int"; return
+                }
+                if name == "netSend" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_NET_SEND); lastTy = "Int"; return
+                }
+                if name == "netRecv" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_NET_RECV); lastTy = "Int"; return
+                }
+                if name == "netClose" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_NET_CLOSE); lastTy = "Int"; return
+                }
+                if name == "procSpawn" {
+                    # procSpawn(cmd)：rcx=cmd，rdx 需清零（无管道）
+                    ePopArgs(nargs, 0)
+                    e8(72); e8(49); e8(210)     # xor rdx, rdx（48 31 D2）
+                    eCallRt(OFF_PROC_SPAWN); lastTy = "Ptr"; return
+                }
+                if name == "procSpawnPipe" {
+                    # procSpawnPipe(cmd)：rcx=cmd，rdx=1（接管 stdout+stderr）
+                    ePopArgs(nargs, 0)
+                    e8(72); e8(199); e8(194)    # mov rdx, imm32（48 C7 C2）
+                    e32(1)
+                    eCallRt(OFF_PROC_SPAWN); lastTy = "Ptr"; return
+                }
+                if name == "procRead" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_PROC_READ); lastTy = "Int"; return
+                }
+                if name == "procWait" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_PROC_WAIT); lastTy = "Int"; return
+                }
+                if name == "procFree" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_PROC_FREE); lastTy = "Int"; return
+                }
+                # ---- agent 原语（EonOS）----
+                if name == "screenW" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_SCREEN_W); lastTy = "Int"; return
+                }
+                if name == "screenH" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_SCREEN_H); lastTy = "Int"; return
+                }
+                if name == "mouseX" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_MOUSE_X); lastTy = "Int"; return
+                }
+                if name == "mouseY" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_MOUSE_Y); lastTy = "Int"; return
+                }
+                if name == "mouseMove" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_MOUSE_MOVE); lastTy = "Int"; return
+                }
+                if name == "mouseDown" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_MOUSE_DOWN); lastTy = "Int"; return
+                }
+                if name == "mouseUp" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_MOUSE_UP); lastTy = "Int"; return
+                }
+                if name == "keyDown" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_KEY_DOWN); lastTy = "Int"; return
+                }
+                if name == "keyUp" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_KEY_UP); lastTy = "Int"; return
+                }
+                if name == "keyVk" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_KEY_VK); lastTy = "Int"; return
+                }
+                if name == "screenshot" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_SCREENSHOT); lastTy = "Int"; return
+                }
                 if name == "ptrAdd" {
                     # ptrAdd(p, i) = p + i：rcx=p, rdx=i → mov rax,rcx; add rax,rdx
                     ePopArgs(nargs, 0)
@@ -1716,8 +2086,47 @@ actor Main {
                     e8(136); e8(17)            # mov byte [rcx], dl（88 11）
                     lastTy = "Int"; return
                 }
-                if name == "strPtr" or name == "ptrToStr" {
-                    # Str 与 Ptr 同为指针，恒等
+                if name == "load64" {
+                    # load64(p)：mov rax, [rcx]（48 8B 01）
+                    ePopArgs(nargs, 0)
+                    e8(72); e8(139); e8(1)
+                    lastTy = "Int"; return
+                }
+                if name == "store64" {
+                    # store64(p, v)：mov [rcx], rdx（48 89 11）
+                    ePopArgs(nargs, 0)
+                    e8(72); e8(137); e8(17)
+                    lastTy = "Int"; return
+                }
+                if name == "isNull" {
+                    # isNull(p)：test rax,rax; sete al; movzx eax,al
+                    ePopArgs(nargs, 0)
+                    e8(72); e8(137); e8(200)   # mov rax, rcx（参数在 rcx）
+                    e8(72); e8(133); e8(192)   # test rax, rax（48 85 C0）
+                    e8(15); e8(148); e8(192)   # sete al（0F 94 C0）
+                    e8(15); e8(182); e8(192)   # movzx eax, al（0F B6 C0）
+                    lastTy = "Int"; return
+                }
+                if name == "strPtr" {
+                    # Str -> Ptr：机器码恒等
+                    ePopArgs(nargs, 0)
+                    e8(72); e8(137); e8(200)   # mov rax, rcx（48 89 C8）
+                    lastTy = "Ptr"; return
+                }
+                if name == "ptrToStr" {
+                    # Ptr -> Str：机器码恒等（类型是 Str，print 要按字符串打印！）
+                    ePopArgs(nargs, 0)
+                    e8(72); e8(137); e8(200)   # mov rax, rcx（48 89 C8）
+                    lastTy = "Str"; return
+                }
+                if name == "ptrToInt" {
+                    # Ptr -> Int：机器码恒等
+                    ePopArgs(nargs, 0)
+                    e8(72); e8(137); e8(200)   # mov rax, rcx（48 89 C8）
+                    lastTy = "Int"; return
+                }
+                if name == "intToPtr" {
+                    # Int -> Ptr：机器码恒等
                     ePopArgs(nargs, 0)
                     e8(72); e8(137); e8(200)   # mov rax, rcx（48 89 C8）
                     lastTy = "Ptr"; return
@@ -1760,6 +2169,11 @@ actor Main {
                     e32(localDisp[li])
                     lastTy = localTy[li]
                 }
+                if localTy[li] == "ActorRef" {
+                    lastRefTy = localRef[li]
+                } else {
+                    lastRefTy = ""
+                }
                 return
             }
             fi3: Int = findField(name)
@@ -1774,12 +2188,28 @@ actor Main {
                     e32(fldOff[fi3])
                     lastTy = fldTy[fi3]
                 }
+                if fldTy[fi3] == "ActorRef" {
+                    lastRefTy = fldRef[fi3]
+                } else {
+                    lastRefTy = ""
+                }
                 return
             }
             err(strCat("未定义的标识符 ", name))
             return
         }
                     }
+    # 导入表总大小（双 DLL）：描述符 3×20 + ILT0(K+1)×8 + ILT1(W+1)×8 + DLL 名 13+11 + hints
+    # 注意：必须先 setupNames()/setup() 填好 inames 再调用
+    def calcImpSize {
+        impSize = 100 + 8 * (NIMP_KERNEL32 + 1) + 8 * (NIMP_WS2 + 1) + 8 * (NIMP_USER32 + 1) + 8 * (NIMP_GDI32 + 1) + 13 + 11 + 11 + 10
+        ci: Int = 0
+        while ci < NIMPORT {
+            impSize = impSize + 2 + strLen(inames[ci]) + 1
+            ci = ci + 1
+        }
+    }
+
     def buildPe {
         setupNames()
         # ---- 1) 读运行时 blob ----
@@ -1790,23 +2220,24 @@ actor Main {
         # .text = blob text (3086) + 填充到 4096 + 用户代码 (cw)
         textUsed: Int = USER_OFF + cw
         textRaw: Int = ((textUsed + 511) / 512) * 512
-        # .rdata = blob rdata (482) + 导入表结构 + 字符串区 (rw)
+        # .rdata = blob rdata (916) + 导入表结构（双 DLL）+ 字符串区 (rw)
         strArea: Int = rw
-        impSize = 40 + 8 * (NIMPORT + 1) + 13
-        ii: Int = 0
-        while ii < NIMPORT {
-            impSize = impSize + 2 + strLen(inames[ii]) + 1
-            ii = ii + 1
-        }
+        calcImpSize()
         rdataUsed: Int = RT_RDATA_LEN + impSize + strArea
         rdataRaw: Int = ((rdataUsed + 511) / 512) * 512
         # .data = blob data
         dataRaw: Int = ((RT_DATA_LEN + 511) / 512) * 512
         fileSize: Int = 512 + textRaw + rdataRaw + dataRaw
-        # RVA 固定布局
-        # .text RVA = 0x1000, .rdata RVA = 0x11000, .data RVA = 0x21000
-        # IAT RVA = 0x21000 + 17152 = 0x25300
-        # image size = 0x21000 + align(dataRaw, 0x1000) = 0x21000 + 0x5000 = 0x26000
+        # RVA 固定布局（与 tools/extract_runtime.py 保持一致）
+        # .text RVA = 0x1000（VirtualSize = RDATA_RVA - TEXT_RVA = 0x20000 = 128KB，容纳用户代码）
+        # .rdata RVA = 0x21000, .data RVA = 0x31000
+        # IAT RVA = 0x31000 + 17720 = 0x35538
+        # 铁律：USER_OFF + cw 不得超过 .text 窗口（128KB），否则 entry 尾部会越进 .rdata 页
+        #       （只读且不可执行 → 取指 DEP 违例，报错位置看起来像"字段写崩"）
+        if USER_OFF + cw > 131072 {
+            err("用户代码超出 .text 空间（>128KB）——请扩大固定布局 RDATA_RVA")
+            return
+        }
 
         # ---- 3) 分配输出缓冲 ----
         out = alloc(fileSize + 16)
@@ -1854,8 +2285,8 @@ actor Main {
         put32(16)                             # NumberOfRvaAndSizes
         # 数据目录 16 项
         put32(0); put32(0)                    # [0] Export
-        put32(RDATA_RVA + RT_RDATA_LEN)       # [1] Import RVA
-        put32(40)                             # Import size
+        put32(RDATA_RVA + RT_RDATA_LEN)       # [1] Import RVA（描述符数组起点）
+        put32(100)                            # Import size（4 个 DLL 描述符 + 全零终止 = 5×20）
         putZeros(80)                          # [2..11] 10 项
         put32(DATA_RVA + IAT_IN_DATA)         # [12] IAT RVA
         put32(8 * (NIMPORT + 1))              # IAT size
@@ -1884,35 +2315,96 @@ actor Main {
         w = 512 + textRaw
         putZeros(0)                           # w 已在正确位置
 
-        # ---- 9) .rdata 段：blob rdata + 导入表 + 字符串 ----
+        # ---- 9) .rdata 段：blob rdata + 导入表（四 DLL：kernel32/ws2_32/user32/gdi32）+ 字符串 ----
+        # 布局（与 whiskerc/pe_x64.py 的 _build_import_items 一致）：
+        #   描述符数组 5×20B（4 DLL + 全零终止）
+        #   ILT0..3 顺序排列 → 4 个 dll 名 → hint-name（扁平顺序）
+        #   IAT 复用 blob .data 里的 __iat__ 槽位（槽位序 = inames 扁平序）
         w = 512 + textRaw
         putBlob(RT_TEXT_LEN, RT_RDATA_LEN)    # blob rdata
         impBase: Int = RT_RDATA_LEN
-        iltRVA: Int = RDATA_RVA + impBase + 40
-        dllRVA: Int = iltRVA + 8 * (NIMPORT + 1)
-        # 描述符
-        put32(iltRVA); put32(0); put32(0); put32(dllRVA); put32(DATA_RVA + IAT_IN_DATA)
-        # ILT 起始：描述符 20B + 20B 空隙（iltRVA 指向 impBase+40）
-        w = 512 + textRaw + impBase + 40
-        # ILT（8 字节步长）
+        nk: Int = NIMP_KERNEL32
+        nw: Int = NIMP_WS2
+        nu: Int = NIMP_USER32
+        ng: Int = NIMP_GDI32
+        descRVA: Int = RDATA_RVA + impBase
+        ilt0RVA: Int = descRVA + 100
+        ilt1RVA: Int = ilt0RVA + 8 * (nk + 1)
+        ilt2RVA: Int = ilt1RVA + 8 * (nw + 1)
+        ilt3RVA: Int = ilt2RVA + 8 * (nu + 1)
+        dll0RVA: Int = ilt3RVA + 8 * (ng + 1)
+        dll1RVA: Int = dll0RVA + 13             # "kernel32.dll\0"
+        dll2RVA: Int = dll1RVA + 11             # "ws2_32.dll\0"
+        dll3RVA: Int = dll2RVA + 11             # "user32.dll\0"
+        hint0RVA: Int = dll3RVA + 10            # "gdi32.dll\0"
+        put32(ilt0RVA); put32(0); put32(0); put32(dll0RVA); put32(DATA_RVA + IAT_IN_DATA)
+        put32(ilt1RVA); put32(0); put32(0); put32(dll1RVA); put32(DATA_RVA + IAT_IN_DATA + 8 * nk)
+        put32(ilt2RVA); put32(0); put32(0); put32(dll2RVA); put32(DATA_RVA + IAT_IN_DATA + 8 * (nk + nw))
+        put32(ilt3RVA); put32(0); put32(0); put32(dll3RVA); put32(DATA_RVA + IAT_IN_DATA + 8 * (nk + nw + nu))
+        put32(0); put32(0); put32(0); put32(0); put32(0)
+        # 各函数的 hint RVA（按扁平顺序预计算，ILT 和 IAT 共用）
         j: Int = 0
-        while j < NIMPORT + 1 {
-            if j < NIMPORT {
-                hint: Int = dllRVA + 13
-                k2: Int = 0
-                while k2 < j {
-                    hint = hint + 2 + strLen(inames[k2]) + 1
-                    k2 = k2 + 1
-                }
-                put32at(w + 8 * j, hint)
-                hintRVA[j] = hint
+        while j < NIMPORT {
+            h: Int = hint0RVA
+            k2: Int = 0
+            while k2 < j {
+                h = h + 2 + strLen(inames[k2]) + 1
+                k2 = k2 + 1
+            }
+            hintRVA[j] = h
+            j = j + 1
+        }
+        # ILT0（kernel32，nk+1 槽，PE32+ 每槽 8 字节，高 32 位保持 0）
+        w = 512 + textRaw + impBase + 100
+        j = 0
+        while j < nk + 1 {
+            if j < nk {
+                put32at(w + 8 * j, hintRVA[j])
             } else {
                 put32at(w + 8 * j, 0)
             }
             j = j + 1
         }
-        w = 512 + textRaw + dllRVA - RDATA_RVA
+        # ILT1（ws2_32，nw+1 槽）
+        w = 512 + textRaw + (ilt1RVA - RDATA_RVA)
+        j = 0
+        while j < nw + 1 {
+            if j < nw {
+                put32at(w + 8 * j, hintRVA[nk + j])
+            } else {
+                put32at(w + 8 * j, 0)
+            }
+            j = j + 1
+        }
+        # ILT2（user32，nu+1 槽）
+        w = 512 + textRaw + (ilt2RVA - RDATA_RVA)
+        j = 0
+        while j < nu + 1 {
+            if j < nu {
+                put32at(w + 8 * j, hintRVA[nk + nw + j])
+            } else {
+                put32at(w + 8 * j, 0)
+            }
+            j = j + 1
+        }
+        # ILT3（gdi32，ng+1 槽）
+        w = 512 + textRaw + (ilt3RVA - RDATA_RVA)
+        j = 0
+        while j < ng + 1 {
+            if j < ng {
+                put32at(w + 8 * j, hintRVA[nk + nw + nu + j])
+            } else {
+                put32at(w + 8 * j, 0)
+            }
+            j = j + 1
+        }
+        # DLL 名 ×4
+        w = 512 + textRaw + (dll0RVA - RDATA_RVA)
         putStr("kernel32.dll"); put8(0)
+        putStr("ws2_32.dll"); put8(0)
+        putStr("user32.dll"); put8(0)
+        putStr("gdi32.dll"); put8(0)
+        # hint-name 表（扁平顺序）
         j = 0
         while j < NIMPORT {
             put16(0); putStr(inames[j]); put8(0)
@@ -1978,3 +2470,4 @@ actor Main {
         main()
     }
 }
+

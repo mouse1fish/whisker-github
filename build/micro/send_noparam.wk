@@ -1,0 +1,5 @@
+
+actor Main {
+    on Start { self.send(Tick()); }
+    on Tick { print("tick"); }
+}

@@ -1,0 +1,171 @@
+    0 (0x02000): 55            -> push rbp
+    1 (0x02001): 48 89 E5       -> mov rbp, rsp
+    4 (0x02004): 48 81 EC       -> sub rsp, 4096
+   11 (0x0200B): 53 48 89 cb 48 8d 05 6d  ??
+   12 (0x0200C): 48 89 CB       -> mov rbx, rcx
+   15 (0x0200F): 48 8D 05   +62317 -> lea rax, [0x11383]
+   22 (0x02016): 50            -> push rax
+   23 (0x02017): 48 8D 05   +62312 -> lea rax, [0x11386]
+   30 (0x0201E): 50            -> push rax
+   31 (0x0201F): 5a 59 e8 0a f9 ff ff 48  ??
+   32 (0x02020): 59 e8 0a f9 ff ff 48 89  ??
+   33 (0x02021): E8     -1782  -> call RT 0x1930
+   38 (0x02026): 48 89 85 f8 ff ff ff e8  ??
+   39 (0x02027): 89 85 f8 ff ff ff e8 45  ??
+   40 (0x02028): 85 f8 ff ff ff e8 45 f5  ??
+   41 (0x02029): f8 ff ff ff e8 45 f5 ff  ??
+   42 (0x0202A): ff ff ff e8 45 f5 ff ff  ??
+   43 (0x0202B): ff ff e8 45 f5 ff ff 48  ??
+   44 (0x0202C): ff e8 45 f5 ff ff 48 8b  ??
+   45 (0x0202D): E8     -2747  -> call RT 0x1577
+   50 (0x02032): 48 8B 85       -> mov rax, [rbp-8]
+   57 (0x02039): 48 89 C1       -> mov rcx, rax
+   60 (0x0203C): E8     -2661  -> call RT 0x15DC
+   65 (0x02041): E8     -2359  -> call RT 0x170F
+   70 (0x02046): E8     -2772  -> call RT 0x1577
+   75 (0x0204B): 48 8B 85       -> mov rax, [rbp-8]
+   82 (0x02052): 50            -> push rax
+   83 (0x02053): 59 e8 a3 f8 ff ff 48 89  ??
+   84 (0x02054): E8     -1885  -> call RT 0x18FC
+   89 (0x02059): 48 89 C1       -> mov rcx, rax
+   92 (0x0205C): E8     -2624  -> call RT 0x1621
+   97 (0x02061): E8     -2391  -> call RT 0x170F
+  102 (0x02066): E8     -2804  -> call RT 0x1577
+  107 (0x0206B): 48 C7 C0       -> mov rax, 42
+  114 (0x02072): 50            -> push rax
+  115 (0x02073): 59 e8 42 f9 ff ff 48 89  ??
+  116 (0x02074): E8     -1726  -> call RT 0x19BB
+  121 (0x02079): 48 89 C1       -> mov rcx, rax
+  124 (0x0207C): E8     -2725  -> call RT 0x15DC
+  129 (0x02081): E8     -2423  -> call RT 0x170F
+  134 (0x02086): 48 8D 05   +62204 -> lea rax, [0x11389]
+  141 (0x0208D): 50            -> push rax
+  142 (0x0208E): 59 e8 5b fa ff ff 48 89  ??
+  143 (0x0208F): E8     -1445  -> call RT 0x1AEF
+  148 (0x02094): 48 89 85 f0 ff ff ff e8  ??
+  149 (0x02095): 89 85 f0 ff ff ff e8 d7  ??
+  150 (0x02096): 85 f0 ff ff ff e8 d7 f4  ??
+  151 (0x02097): f0 ff ff ff e8 d7 f4 ff  ??
+  152 (0x02098): ff ff ff e8 d7 f4 ff ff  ??
+  153 (0x02099): ff ff e8 d7 f4 ff ff 48  ??
+  154 (0x0209A): ff e8 d7 f4 ff ff 48 8b  ??
+  155 (0x0209B): E8     -2857  -> call RT 0x1577
+  160 (0x020A0): 48 8B 85       -> mov rax, [rbp-16]
+  167 (0x020A7): 50            -> push rax
+  168 (0x020A8): 48 C7 C0       -> mov rax, 5
+  175 (0x020AF): 48 8B C8       -> mov rcx, rax
+  178 (0x020B2): 58            -> pop rax
+  179 (0x020B3): 48 01 c8 48 89 c1 e8 63  ??
+  180 (0x020B4): 01 c8 48 89 c1 e8 63 f5  ??
+  181 (0x020B5): c8 48 89 c1 e8 63 f5 ff  ??
+  182 (0x020B6): 48 89 C1       -> mov rcx, rax
+  185 (0x020B9): E8     -2717  -> call RT 0x1621
+  190 (0x020BE): E8     -2484  -> call RT 0x170F
+  195 (0x020C3): 48 8B 85       -> mov rax, [rbp-8]
+  202 (0x020CA): 50            -> push rax
+  203 (0x020CB): 48 8D 05   +62138 -> lea rax, [0x1138C]
+  210 (0x020D2): 48 8B C8       -> mov rcx, rax
+  213 (0x020D5): 58            -> pop rax
+  214 (0x020D6): 48 89 CA       -> mov rdx, rcx
+  217 (0x020D9): 48 89 C1       -> mov rcx, rax
+  220 (0x020DC): E8     -1307  -> call RT 0x1BC6
+  225 (0x020E1): 48 85 c0 0f 84 1e 00 00  ??
+  226 (0x020E2): 85 c0 0f 84 1e 00 00 00  ??
+  227 (0x020E3): c0 0f 84 1e 00 00 00 e8  ??
+  228 (0x020E4): 0F 84      +30 -> je 0x2108
+  234 (0x020EA): E8     -2936  -> call RT 0x1577
+  239 (0x020EF): 48 8D 05   +62107 -> lea rax, [0x11391]
+  246 (0x020F6): 48 89 C1       -> mov rcx, rax
+  249 (0x020F9): E8     -2850  -> call RT 0x15DC
+  254 (0x020FE): E8     -2548  -> call RT 0x170F
+  259 (0x02103): E9        +0  -> jmp 0x2108
+  264 (0x02108): 48 8B 85       -> mov rax, [rbp-8]
+  271 (0x0210F): 50            -> push rax
+  272 (0x02110): 48 8D 05   +62081 -> lea rax, [0x11398]
+  279 (0x02117): 48 8B C8       -> mov rcx, rax
+  282 (0x0211A): 58            -> pop rax
+  283 (0x0211B): 48 89 CA       -> mov rdx, rcx
+  286 (0x0211E): 48 89 C1       -> mov rcx, rax
+  289 (0x02121): E8     -1376  -> call RT 0x1BC6
+  294 (0x02126): 48 85 c0 0f 84 1e 00 00  ??
+  295 (0x02127): 85 c0 0f 84 1e 00 00 00  ??
+  296 (0x02128): c0 0f 84 1e 00 00 00 e8  ??
+  297 (0x02129): 0F 84      +30 -> je 0x214D
+  303 (0x0212F): E8     -3005  -> call RT 0x1577
+  308 (0x02134): 48 8D 05   +62050 -> lea rax, [0x1139D]
+  315 (0x0213B): 48 89 C1       -> mov rcx, rax
+  318 (0x0213E): E8     -2919  -> call RT 0x15DC
+  323 (0x02143): E8     -2617  -> call RT 0x170F
+  328 (0x02148): E9        +0  -> jmp 0x214D
+  333 (0x0214D): E8     -3035  -> call RT 0x1577
+  338 (0x02152): 48 C7 C0       -> mov rax, 9
+  345 (0x02159): 50            -> push rax
+  346 (0x0215A): E8       +50  -> call USER 0x2191
+  351 (0x0215F): 48 89 C1       -> mov rcx, rax
+  354 (0x02162): E8     -2886  -> call RT 0x1621
+  359 (0x02167): E8     -2653  -> call RT 0x170F
+  364 (0x0216C): E8     -3066  -> call RT 0x1577
+  369 (0x02171): 48 8D 05   +61997 -> lea rax, [0x113A5]
+  376 (0x02178): 50            -> push rax
+  377 (0x02179): E8       +83  -> call USER 0x21D1
+  382 (0x0217E): 48 89 C1       -> mov rcx, rax
+  385 (0x02181): E8     -2917  -> call RT 0x1621
+  390 (0x02186): E8     -2684  -> call RT 0x170F
+  395 (0x0218B): 5B            -> pop rbx
+  396 (0x0218C): 48 89 EC       -> mov rsp, rbp
+  399 (0x0218F): 5D            -> pop rbp
+  400 (0x02190): C3            -> ret
+  401 (0x02191): 55            -> push rbp
+  402 (0x02192): 48 89 E5       -> mov rbp, rsp
+  405 (0x02195): 48 81 EC       -> sub rsp, 4096
+  412 (0x0219C): 53 48 89 cb 48 89 95 f8  ??
+  413 (0x0219D): 48 89 CB       -> mov rbx, rcx
+  416 (0x021A0): 48 89 95 f8 ff ff ff 48  ??
+  417 (0x021A1): 89 95 f8 ff ff ff 48 8b  ??
+  418 (0x021A2): 95 f8 ff ff ff 48 8b 85  ??
+  419 (0x021A3): f8 ff ff ff 48 8b 85 f8  ??
+  420 (0x021A4): ff ff ff 48 8b 85 f8 ff  ??
+  421 (0x021A5): ff ff 48 8b 85 f8 ff ff  ??
+  422 (0x021A6): ff 48 8b 85 f8 ff ff ff  ??
+  423 (0x021A7): 48 8B 85       -> mov rax, [rbp-8]
+  430 (0x021AE): 50            -> push rax
+  431 (0x021AF): 48 8B 85       -> mov rax, [rbp-8]
+  438 (0x021B6): 48 8B C8       -> mov rcx, rax
+  441 (0x021B9): 58            -> pop rax
+  442 (0x021BA): 48 0f af c1 5b 48 89 ec  ??
+  443 (0x021BB): 0f af c1 5b 48 89 ec 5d  ??
+  444 (0x021BC): af c1 5b 48 89 ec 5d c3  ??
+  445 (0x021BD): c1 5b 48 89 ec 5d c3 48  ??
+  446 (0x021BE): 5B            -> pop rbx
+  447 (0x021BF): 48 89 EC       -> mov rsp, rbp
+  450 (0x021C2): 5D            -> pop rbp
+  451 (0x021C3): C3            -> ret
+  452 (0x021C4): 48 C7 C0       -> mov rax, 0
+  459 (0x021CB): 5B            -> pop rbx
+  460 (0x021CC): 48 89 EC       -> mov rsp, rbp
+  463 (0x021CF): 5D            -> pop rbp
+  464 (0x021D0): C3            -> ret
+  465 (0x021D1): 55            -> push rbp
+  466 (0x021D2): 48 89 E5       -> mov rbp, rsp
+  469 (0x021D5): 48 81 EC       -> sub rsp, 4096
+  476 (0x021DC): 53 48 89 cb 48 89 95 f8  ??
+  477 (0x021DD): 48 89 CB       -> mov rbx, rcx
+  480 (0x021E0): 48 89 95 f8 ff ff ff 48  ??
+  481 (0x021E1): 89 95 f8 ff ff ff 48 8d  ??
+  482 (0x021E2): 95 f8 ff ff ff 48 8d 05  ??
+  483 (0x021E3): f8 ff ff ff 48 8d 05 bf  ??
+  484 (0x021E4): ff ff ff 48 8d 05 bf f1  ??
+  485 (0x021E5): ff ff 48 8d 05 bf f1 00  ??
+  486 (0x021E6): ff 48 8d 05 bf f1 00 00  ??
+  487 (0x021E7): 48 8D 05   +61887 -> lea rax, [0x113AD]
+  494 (0x021EE): 50            -> push rax
+  495 (0x021EF): 48 8B 85       -> mov rax, [rbp-8]
+  502 (0x021F6): 50            -> push rax
+  503 (0x021F7): 5a 59 e8 32 f7 ff ff 5b  ??
+  504 (0x021F8): 59 e8 32 f7 ff ff 5b 48  ??
+  505 (0x021F9): E8     -2254  -> call RT 0x1930
+  510 (0x021FE): 5B            -> pop rbx
+  511 (0x021FF): 48 89 EC       -> mov rsp, rbp
+  514 (0x02202): 5D            -> pop rbp
+  515 (0x02203): C3            -> ret
+  516 (0x02204): 48 C7 C0       -> mov rax, 0

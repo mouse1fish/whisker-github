@@ -1,0 +1,12 @@
+# wkcc —— 用 Whisker 写的 Whisker 编译器（自举第 9 步）
+# 读取 build\lex_input.txt
+
+actor Main {
+    # ==== 词法状态 ====
+    src: Ptr
+    limit: Int = 0
+    pos: Int = 0
+    on Start {
+        print(1)
+    }
+}

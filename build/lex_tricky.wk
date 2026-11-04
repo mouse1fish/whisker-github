@@ -1,0 +1,37 @@
+// 行注释
+# 井号注释
+/* 块注释
+   跨行 */
+actor Demo {
+    a: Int = 1_000_000
+    b: Int = 0xDE_AD_BE_EF
+    hex2: Int = 0x2A
+    s1: Str = "hello\tworld\n"
+    s2: Str = '单引号 " 也可以'
+    flag: Bool = True and not False
+
+    on Run[x: Int] {
+        arr: Int[8]
+        arr[x % 8] = x / 3 - x * 2 + x % 5
+        if x <= 10 and x >= 3 or x != 7 {
+            print(intToStr(x), "..=", arr[x % 8])
+        } elif x == 0 {
+            print("?")
+        } else {
+            print("!==")
+        }
+        while x > 0 {
+            x = x - 1
+            if x == 5 { break }
+        }
+        for i in 0 ..= 2 {
+            self.send(Tick(self))
+        }
+        q: Ptr = alloc(16)
+        store64(q, load64(ptrAdd(q, 8)))
+    }
+
+    on Tick[who: ActorRef[Demo]] {
+        who.send(Ping)
+    }
+}

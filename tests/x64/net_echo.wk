@@ -1,0 +1,64 @@
+# net_echo.wk —— TCP 原语验收：Server 监听回显，Client 连接收发
+# 期望输出：server 收到 18 字节 / client 收到: hello-whisker-net
+actor Server {
+    cli: ActorRef[Client]
+    port: Int = 47231
+
+    on SetClient[c: ActorRef[Client]] {
+        cli = c
+    }
+
+    on Listen {
+        netInit()
+        ls: Int = netListen(port)
+        if ls < 0 {
+            print("server listen 失败 err=", netErr())
+        } else {
+            print("server 已监听 ", port)
+            cli.send(Listening(ls))
+            cs: Int = netAccept(ls)
+            if cs < 0 {
+                print("server accept 失败 err=", netErr())
+            } else {
+                buf: Ptr = alloc(256)
+                n: Int = netRecv(cs, buf, 255)
+                print("server 收到 ", n, " 字节")
+                netSend(cs, buf, n)
+                netClose(cs)
+            }
+            netClose(ls)
+        }
+    }
+}
+
+actor Client {
+    port: Int = 47231
+
+    on Listening[ls: Int] {
+        s: Int = netConnect("127.0.0.1", port)
+        if s < 0 {
+            print("client connect 失败 err=", netErr())
+        } else {
+            msg: Str = "hello-whisker-net"
+            n: Int = netSend(s, strPtr(msg), strLen(msg))
+            print("client 已发送 ", n, " 字节")
+            buf: Ptr = alloc(256)
+            r: Int = netRecv(s, buf, 255)
+            store8(ptrAdd(buf, r), 0)
+            print("client 收到: ", ptrToStr(buf))
+            netClose(s)
+        }
+    }
+}
+
+actor Main {
+    srv: ActorRef[Server]
+    cli: ActorRef[Client]
+
+    on Start {
+        srv = spawn Server
+        cli = spawn Client
+        srv.send(SetClient(cli))
+        srv.send(Listen())
+    }
+}

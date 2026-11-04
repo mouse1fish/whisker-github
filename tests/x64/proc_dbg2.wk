@@ -1,0 +1,31 @@
+# proc_dbg2.wk —— 循环读到 EOF + 退出码，逐步打点
+actor Main {
+    on Start {
+        p: Ptr = procSpawnPipe("cmd.exe /c echo HI")
+        if isNull(p) {
+            print("spawn 失败")
+        } else {
+            buf: Ptr = alloc(64)
+            total: Int = 0
+            n: Int = 1
+            r: Int = 0
+            while n > 0 {
+                n = procRead(p, ptrAdd(buf, total), 64 - total)
+                print("read 返回 ", n)
+                if n > 0 {
+                    total = total + n
+                }
+                r = r + 1
+                if r > 8 {
+                    print("读超过 8 次，退出循环")
+                    n = 0
+                }
+            }
+            store8(ptrAdd(buf, total), 0)
+            print("总字节=", total, " 内容=", ptrToStr(buf))
+            c: Int = procWait(p)
+            print("退出码=", c)
+        }
+        print("完成")
+    }
+}

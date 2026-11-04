@@ -51,15 +51,16 @@ def main() -> int:
 
     text_len = len(a.code)
     TEXT_RVA = 0x1000
-    # 固定布局：给用户代码预留 0x10000 字节的 .text 空间，段 RVA 全部固定，
-    # 这样 blob 的 RIP 引用永远有效，与用户代码大小无关
-    RDATA_RVA = 0x11000
-    DATA_RVA = 0x21000
+    # 固定布局：给用户代码预留 0x20000 字节的 .text 空间（128KB，留足自举编译器自身的体积），
+    # 段 RVA 全部固定，这样 blob 的 RIP 引用永远有效，与用户代码大小无关
+    RDATA_RVA = 0x21000
+    DATA_RVA = 0x31000
     rdata_rva = RDATA_RVA
     data_rva = DATA_RVA
-    image_size = 0x31000
     rdata_size, rdata_off = pe._layout(pe.rdata)
     data_size, data_off = pe._layout(pe.data)
+    # 镜像大小：.data 段按 4KB 对齐（与 wkcc.wk buildPe 的 soi 计算一致）
+    image_size = DATA_RVA + ((data_size + 0xFFF) // 0x1000) * 0x1000
 
     labels: dict[str, tuple[int, int]] = {}
     for it in pe.rdata:
@@ -128,6 +129,56 @@ def main() -> int:
     (ROOT / "build" / "rt_blob.bin").write_bytes(blob)
     print(f"已生成 build/rt_blob.bin（{len(blob)} 字节 = text {len(code)} + rdata {len(rdata_bytes)} + data {len(data_bytes)}）")
     print(f"__iat__ 在 data 内偏移：{data_off['__iat__']}（IAT RVA = 0x{iat_rva:X}）")
+
+    # ---- wkcc.wk 常量同步块（复制到 tools/wkcc.wk 的常量区）----
+    name_map = {
+        "rt_init": "OFF_RT_INIT", "rt_actor_new": "OFF_ACTOR_NEW", "rt_send": "OFF_SEND",
+        "rt_run": "OFF_RUN", "rt_print_begin": "OFF_PBEGIN", "rt_print_int": "OFF_PRINT_INT",
+        "rt_print_end": "OFF_PRINT_END", "rt_print_cstr": "OFF_PCSTR", "rt_print_bool": "OFF_PBOOL",
+        "rt_print_str": "OFF_PSTR", "rt_alloc": "OFF_ALLOC", "rt_str_cat": "OFF_STR_CAT",
+        "rt_str_len": "OFF_STR_LEN", "rt_int_to_str": "OFF_INT_TO_STR",
+        "rt_str_to_int": "OFF_STR_TO_INT", "rt_copy": "OFF_COPY",
+        "rt_read_file": "OFF_READ_BYTES", "rt_write_file": "OFF_WRITE_BYTES",
+        "rt_zero": "OFF_ZERO", "rt_bounds_fail": "OFF_BOUNDS_FAIL",
+        "rt_str_eq": "OFF_STR_EQ", "rt_now_ms": "OFF_NOW_MS",
+        "rt_sleep_ms": "OFF_SLEEP_MS", "rt_wall_ms": "OFF_WALL_MS",
+        "rt_net_init": "OFF_NET_INIT", "rt_net_err": "OFF_NET_ERR",
+        "rt_net_listen": "OFF_NET_LISTEN", "rt_net_listen_loop": "OFF_NET_LISTEN_L",
+        "rt_net_accept": "OFF_NET_ACCEPT",
+        "rt_net_connect": "OFF_NET_CONNECT", "rt_net_send": "OFF_NET_SEND",
+        "rt_net_recv": "OFF_NET_RECV", "rt_net_close": "OFF_NET_CLOSE",
+        "rt_proc_spawn": "OFF_PROC_SPAWN", "rt_proc_spawn_n": "OFF_PROC_SPAWN_N",
+        "rt_proc_read": "OFF_PROC_READ", "rt_proc_wait": "OFF_PROC_WAIT",
+        "rt_proc_free": "OFF_PROC_FREE",
+        "rt_screen_w": "OFF_SCREEN_W", "rt_screen_h": "OFF_SCREEN_H",
+        "rt_mouse_x": "OFF_MOUSE_X", "rt_mouse_y": "OFF_MOUSE_Y",
+        "rt_mouse_move": "OFF_MOUSE_MOVE", "rt_mouse_down": "OFF_MOUSE_DOWN",
+        "rt_mouse_up": "OFF_MOUSE_UP", "rt_key_down": "OFF_KEY_DOWN",
+        "rt_key_up": "OFF_KEY_UP", "rt_key_vk": "OFF_KEY_VK",
+        "rt_screenshot": "OFF_SCREENSHOT",
+    }
+    print("\n==== wkcc.wk 常量同步块（RT_DATA_OFF = text + rdata，勿漏）====")
+    for name in sorted(syms):
+        wk = name_map.get(name)
+        if wk:
+            print(f"    {wk}: Int = {syms[name]}")
+    nkernel32 = sum(1 for f in imports if pe.func_dll.get(f, pe.dll) == pe.dll)
+    print(f"    RT_TEXT_LEN: Int = {len(code)}")
+    print(f"    RT_RDATA_LEN: Int = {len(rdata_bytes)}")
+    print(f"    RT_DATA_LEN: Int = {len(data_bytes)}")
+    print(f"    RT_DATA_OFF: Int = {len(code) + len(rdata_bytes)}")
+    print(f"    RDATA_RVA: Int = {rdata_rva}")
+    print(f"    DATA_RVA: Int = {data_rva}")
+    print(f"    IMAGE_SIZE: Int = {image_size}")
+    print(f"    IAT_RVA: Int = {iat_rva}")
+    print(f"    IAT_IN_DATA: Int = {data_off['__iat__']}")
+    print(f"    NIMPORT: Int = {len(imports)}")
+    print(f"    NIMP_KERNEL32: Int = {nkernel32}")
+    print(f"    USER_OFF: Int = {((len(code) + 4095) // 4096) * 4096}   # blob text 向上取 4KB 对齐")
+    print("==== 导入顺序（wkcc.wk inames 必须与此一致）====")
+    for i, f in enumerate(imports):
+        dll = pe.func_dll.get(f, pe.dll)
+        print(f"    inames[{i}] = \"{f}\"   # {dll}")
     return 0
 
 

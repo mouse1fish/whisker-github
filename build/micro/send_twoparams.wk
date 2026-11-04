@@ -1,0 +1,6 @@
+
+actor Main {
+    n: Int = 0
+    on Start { self.send(Bump(1, 2)); }
+    on Bump[a: Int, b: Int] { n = a + b; print("n=", n); }
+}

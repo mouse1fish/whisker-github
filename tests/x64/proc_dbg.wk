@@ -1,0 +1,21 @@
+# proc_dbg.wk —— 进程原语逐步诊断（定位卡点）
+actor Main {
+    on Start {
+        print("1 spawn 前")
+        p: Ptr = procSpawnPipe("cmd.exe /c echo HI")
+        if isNull(p) {
+            print("2 spawn 失败")
+        } else {
+            print("2 spawn 成功")
+            buf: Ptr = alloc(64)
+            print("3 read 前")
+            n: Int = procRead(p, buf, 63)
+            print("4 read 后 n=", n)
+            store8(ptrAdd(buf, n), 0)
+            print("5 内容=", ptrToStr(buf))
+            c: Int = procWait(p)
+            print("6 退出码=", c)
+        }
+        print("7 完成")
+    }
+}

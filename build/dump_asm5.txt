@@ -1,0 +1,31 @@
+[whisker] 机器码清单（5515 字节）
+  000000  spinlock acquire/release
+  00002C  rt_init
+  000194  rt_alloc
+  000278  rt_actor_new
+  00029E  rt_send
+  000363  rt_worker
+  00050E  rt_run
+  00061C  rt_print_begin
+  00080E  rt_zero / rt_bounds_fail / rt_read_file / rt_write_file
+  0009AB  rt_str_len / rt_str_cat / rt_int_to_str / rt_copy
+  000C33  rt_now_ms
+  000C75  rt_str_eq
+  000CBD  rt_sleep_ms / rt_wall_ms
+  000CE9  rt_net_init：WSAStartup(2.2)
+  000D25  rt_net_err：最近一次 Winsock 错误码
+  000DC3  rt_net_listen(port) -> 监听 socket / -1
+  000E83  rt_net_accept(lsock) -> 客户端 socket / -1
+  000E9F  rt_net_connect(host, port) -> socket / -1
+  000F3D  rt_net_send(sock, buf, len) -> 发送字节数 / -1
+  000F59  rt_net_recv(sock, buf, maxlen) -> 收到字节数（0=对端关闭）/ -1
+  000F75  rt_net_close(sock) -> 0 / -1
+  000F8E  rt_proc_spawn
+  001175  rt_proc_spawn_n(cmd)：无管道版（rt_proc_spawn 的 rdx=0 包装）
+  00117D  rt_proc_read
+  0011EE  rt_proc_wait
+  001243  rt_proc_free
+  001286  handler Main.Start
+  0014E0  dispatch Main
+  001521  program entry
+[whisker] 成功（自研 x64 后端，无 C/LLVM/链接器参与）：G:\trea-Eon-os\trea-xiancheng-bianyiqi\build\proc_dbg5.exe

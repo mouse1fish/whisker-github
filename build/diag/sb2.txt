@@ -1,0 +1,8 @@
+﻿bash : ???????????
+所在位置 行:1 字符: 162
++ ... ing = [Console]::OutputEncoding; bash tools/selfbuild.sh 2>&1 | Out-F ...
++                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (???????????:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+

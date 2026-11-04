@@ -1,0 +1,5 @@
+actor Main {
+    on Start {
+        print(42)
+    }
+}

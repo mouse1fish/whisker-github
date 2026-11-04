@@ -1,0 +1,40 @@
+# msg_min.wk —— 最小跨 actor 消息测试（隔离网络因素）
+actor Ping {
+    peer: ActorRef[Pong]
+
+    on SetPeer[p: ActorRef[Pong]] {
+        peer = p
+        print("Ping: peer 已设置")
+        peer.send(Poke(7))
+    }
+
+    on Poked[v: Int] {
+        print("Ping: 收到 Poked ", v)
+    }
+}
+
+actor Pong {
+    back: ActorRef[Ping]
+
+    on SetBack[b: ActorRef[Ping]] {
+        back = b
+    }
+
+    on Poke[v: Int] {
+        print("Pong: 收到 Poke ", v)
+        back.send(Poked(v + 1))
+    }
+}
+
+actor Main {
+    pg: ActorRef[Ping]
+    po: ActorRef[Pong]
+
+    on Start {
+        pg = spawn Ping
+        po = spawn Pong
+        po.send(SetBack(pg))
+        pg.send(SetPeer(po))
+        print("Main: 消息已发")
+    }
+}

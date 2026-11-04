@@ -1,0 +1,8 @@
+actor Main {
+    on Start {
+        print("HI-STR 中文")
+        s: Str = "XY"
+        n: Int = writeBytes("build/t_min.txt", strPtr(s), 2)
+        print(" wrote=", n)
+    }
+}

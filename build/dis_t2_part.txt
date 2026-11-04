@@ -1,0 +1,70 @@
+   15 (0x0200F): 48 C7 C0       -> mov rax, 0
+   22 (0x02016): 48 89 85 f8 ff ff ff 48  ??
+   23 (0x02017): 89 85 f8 ff ff ff 48 c7  ??
+   24 (0x02018): 85 f8 ff ff ff 48 c7 c0  ??
+   25 (0x02019): f8 ff ff ff 48 c7 c0 00  ??
+   26 (0x0201A): ff ff ff 48 c7 c0 00 00  ??
+   27 (0x0201B): ff ff 48 c7 c0 00 00 00  ??
+   28 (0x0201C): ff 48 c7 c0 00 00 00 00  ??
+   29 (0x0201D): 48 C7 C0       -> mov rax, 0
+   36 (0x02024): 48 C7 C0       -> mov rax, 10
+   43 (0x0202B): 48 89 85 f0 ff ff ff 48  ??
+   44 (0x0202C): 89 85 f0 ff ff ff 48 89  ??
+   45 (0x0202D): 85 f0 ff ff ff 48 89 85  ??
+   46 (0x0202E): f0 ff ff ff 48 89 85 e8  ??
+   47 (0x0202F): ff ff ff 48 89 85 e8 ff  ??
+   48 (0x02030): ff ff 48 89 85 e8 ff ff  ??
+   49 (0x02031): ff 48 89 85 e8 ff ff ff  ??
+   50 (0x02032): 48 89 85 e8 ff ff ff 48  ??
+   51 (0x02033): 89 85 e8 ff ff ff 48 8b  ??
+   52 (0x02034): 85 e8 ff ff ff 48 8b 85  ??
+   53 (0x02035): E8 +1224736767  -> call USER 0x49002039
+   58 (0x0203A): 8b 85 f0 ff ff ff 48 3b  ??
+   59 (0x0203B): 85 f0 ff ff ff 48 3b a5  ??
+   60 (0x0203C): f0 ff ff ff 48 3b a5 e8  ??
+   61 (0x0203D): ff ff ff 48 3b a5 e8 ff  ??
+   62 (0x0203E): ff ff 48 3b a5 e8 ff ff  ??
+   63 (0x0203F): ff 48 3b a5 e8 ff ff ff  ??
+   64 (0x02040): 48 3b a5 e8 ff ff ff 0f  ??
+   65 (0x02041): 3b a5 e8 ff ff ff 0f 9d  ??
+   66 (0x02042): a5 e8 ff ff ff 0f 9d 47  ??
+   67 (0x02043): E8 +268435455  -> call USER 0x10002047
+   72 (0x02048): 9d 47 00 00 00 48 8b 85  ??
+   73 (0x02049): 47 00 00 00 48 8b 85 f8  ??
+   74 (0x0204A): 00 00 00 48 8b 85 f8 ff  ??
+   75 (0x0204B): 00 00 48 8b 85 f8 ff ff  ??
+   76 (0x0204C): 00 48 8b 85 f8 ff ff ff  ??
+   77 (0x0204D): 48 8B 85       -> mov rax, [rbp-8]
+   84 (0x02054): 50            -> push rax
+   85 (0x02055): 48 8B 85       -> mov rax, [rbp-16]
+   92 (0x0205C): 50            -> push rax
+   93 (0x0205D): 48 C7 C0       -> mov rax, 2
+  100 (0x02064): 48 8B C8       -> mov rcx, rax
+  103 (0x02067): 58            -> pop rax
+  104 (0x02068): 48 0f af c8 48 8b c8 58  ??
+  105 (0x02069): 0f af c8 48 8b c8 58 48  ??
+  106 (0x0206A): af c8 48 8b c8 58 48 01  ??
+  107 (0x0206B): c8 48 8b c8 58 48 01 c8  ??
+  108 (0x0206C): 48 8B C8       -> mov rcx, rax
+  111 (0x0206F): 58            -> pop rax
+  112 (0x02070): 48 01 c8 48 8b c8 48 89  ??
+  113 (0x02071): 01 c8 48 8b c8 48 89 8d  ??
+  114 (0x02072): c8 48 8b c8 48 89 8d f8  ??
+  115 (0x02073): 48 8B C8       -> mov rcx, rax
+  118 (0x02076): 48 89 8d f8 ff ff ff 48  ??
+  119 (0x02077): 89 8d f8 ff ff ff 48 8b  ??
+  120 (0x02078): 8d f8 ff ff ff 48 8b 85  ??
+  121 (0x02079): f8 ff ff ff 48 8b 85 f0  ??
+  122 (0x0207A): ff ff ff 48 8b 85 f0 ff  ??
+  123 (0x0207B): ff ff 48 8b 85 f0 ff ff  ??
+  124 (0x0207C): ff 48 8b 85 f0 ff ff ff  ??
+  125 (0x0207D): 48 8B 85       -> mov rax, [rbp-16]
+  132 (0x02084): 48 83 C0       -> add rax, 1
+  136 (0x02088): 48 89 85 f0 ff ff ff e9  ??
+  137 (0x02089): 89 85 f0 ff ff ff e9 a5  ??
+  138 (0x0208A): 85 f0 ff ff ff e9 a5 ff  ??
+  139 (0x0208B): f0 ff ff ff e9 a5 ff ff  ??
+  140 (0x0208C): ff ff ff e9 a5 ff ff ff  ??
+  141 (0x0208D): ff ff e9 a5 ff ff ff e8  ??
+  142 (0x0208E): ff e9 a5 ff ff ff e8 de  ??
+  143 (0x0208F): E9       -91  -> jmp 0x2039

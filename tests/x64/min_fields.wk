@@ -1,0 +1,15 @@
+# 最小复现：带大数组 + 数组后标量字段的 actor（entry 字段初始化）
+# 用 wkcc.exe 编译 → 观察运行时 entry 字段写是否崩
+actor Main {
+    a: Int = 11
+    b: Int = 22
+    c: Int = 33
+    big: Int[65536]
+    d: Int = 44
+    s: Str
+    e: Int = 55
+
+    on Start {
+        print("fields: ", a, " ", b, " ", c, " ", d, " ", e)
+    }
+}

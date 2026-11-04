@@ -843,11 +843,43 @@ class Fn:
                 return
             if e.name in ("alloc", "ptrAdd", "load8", "load64", "isNull", "store8",
                           "store64", "copyBytes", "strLen", "strCat", "intToStr",
-                          "readBytes", "writeBytes", "strPtr", "ptrToStr", "strToInt"):
+                          "readBytes", "writeBytes", "strPtr", "ptrToStr", "strToInt",
+                          "netListen", "netListenLocal", "netAccept", "netConnect", "netSend", "netRecv",
+                          "netClose", "procSpawn", "procSpawnPipe",
+                          "procRead", "procWait", "procFree",
+                          "ptrToInt", "intToPtr",
+                          "mouseMove", "mouseDown", "mouseUp",
+                          "keyDown", "keyUp", "keyVk", "screenshot"):
                 self.builtin_call(e)
                 return
             if e.name == "nowMs":
                 a.call("rt_now_ms")
+                return
+            if e.name == "wallMs":
+                a.call("rt_wall_ms")
+                return
+            if e.name == "netInit":
+                a.call("rt_net_init")
+                return
+            if e.name == "netErr":
+                a.call("rt_net_err")
+                return
+            if e.name == "screenW":
+                a.call("rt_screen_w")
+                return
+            if e.name == "screenH":
+                a.call("rt_screen_h")
+                return
+            if e.name == "mouseX":
+                a.call("rt_mouse_x")
+                return
+            if e.name == "mouseY":
+                a.call("rt_mouse_y")
+                return
+            if e.name == "sleepMs":
+                self.eval(e.args[0])
+                a.mov_rr(RCX, RAX)
+                a.call("rt_sleep_ms")
                 return
             raise CodegenError(f"函数 {e.name} 不能出现在值位置")
 
@@ -957,6 +989,117 @@ class Fn:
             a.mov_rm(RDX, RSP, self.f.disp(t1))
             a.mov_rm(R8, RSP, self.f.disp(t2))
             a.call("rt_read_file" if name == "readBytes" else "rt_write_file")
+            return
+
+        # ---- 系统原语（EonOS 地基）----
+        if name == "procSpawn" or name == "procSpawnPipe":   # (命令行) -> 进程块
+            self.eval(e.args[0])
+            a.mov_rr(RCX, RAX)
+            if name == "procSpawnPipe":
+                a.mov_ri(RDX, 1)
+            else:
+                a.xor_rr(RDX, RDX)
+            a.call("rt_proc_spawn")
+            return
+
+        if name == "procRead":                   # (进程块, 缓冲, 最大字节)
+            t0 = self.eval_to_temp(e.args[0])
+            t1 = self.eval_to_temp(e.args[1])
+            t2 = self.eval_to_temp(e.args[2])
+            a.mov_rm(RCX, RSP, self.f.disp(t0))
+            a.mov_rm(RDX, RSP, self.f.disp(t1))
+            a.mov_rm(R8, RSP, self.f.disp(t2))
+            a.call("rt_proc_read")
+            return
+
+        if name == "procWait":                   # (进程块) -> 退出码
+            self.eval(e.args[0])
+            a.mov_rr(RCX, RAX)
+            a.call("rt_proc_wait")
+            return
+
+        if name == "procFree":                   # (进程块)
+            self.eval(e.args[0])
+            a.mov_rr(RCX, RAX)
+            a.call("rt_proc_free")
+            return
+
+        if name == "netListen":                  # (端口) -> 监听 socket
+            self.eval(e.args[0])
+            a.mov_rr(RCX, RAX)
+            a.call("rt_net_listen")
+            return
+
+        if name == "netListenLocal":             # (端口) -> 监听 socket（仅回环）
+            self.eval(e.args[0])
+            a.mov_rr(RCX, RAX)
+            a.call("rt_net_listen_loop")
+            return
+
+        if name == "netAccept":                  # (监听 socket) -> 客户端 socket
+            self.eval(e.args[0])
+            a.mov_rr(RCX, RAX)
+            a.call("rt_net_accept")
+            return
+
+        if name == "netConnect":                 # (主机, 端口) -> socket
+            t0 = self.eval_to_temp(e.args[0])
+            t1 = self.eval_to_temp(e.args[1])
+            a.mov_rm(RCX, RSP, self.f.disp(t0))
+            a.mov_rm(RDX, RSP, self.f.disp(t1))
+            a.call("rt_net_connect")
+            return
+
+        if name in ("netSend", "netRecv"):       # (socket, 缓冲, 长度)
+            t0 = self.eval_to_temp(e.args[0])
+            t1 = self.eval_to_temp(e.args[1])
+            t2 = self.eval_to_temp(e.args[2])
+            a.mov_rm(RCX, RSP, self.f.disp(t0))
+            a.mov_rm(RDX, RSP, self.f.disp(t1))
+            a.mov_rm(R8, RSP, self.f.disp(t2))
+            a.call("rt_net_send" if name == "netSend" else "rt_net_recv")
+            return
+
+        if name == "netClose":                   # (socket)
+            self.eval(e.args[0])
+            a.mov_rr(RCX, RAX)
+            a.call("rt_net_close")
+            return
+
+        if name == "mouseMove":                  # (x, y)
+            t0 = self.eval_to_temp(e.args[0])
+            t1 = self.eval_to_temp(e.args[1])
+            a.mov_rm(RCX, RSP, self.f.disp(t0))
+            a.mov_rm(RDX, RSP, self.f.disp(t1))
+            a.call("rt_mouse_move")
+            return
+
+        if name == "mouseDown" or name == "mouseUp":
+            self.eval(e.args[0])
+            a.mov_rr(RCX, RAX)
+            a.call("rt_mouse_down" if name == "mouseDown" else "rt_mouse_up")
+            return
+
+        if name == "keyDown" or name == "keyUp" or name == "keyVk":
+            self.eval(e.args[0])
+            a.mov_rr(RCX, RAX)
+            if name == "keyDown":
+                a.call("rt_key_down")
+            elif name == "keyUp":
+                a.call("rt_key_up")
+            else:
+                a.call("rt_key_vk")
+            return
+
+        if name == "screenshot":                 # (路径)
+            self.eval(e.args[0])
+            a.mov_rr(RCX, RAX)
+            a.call("rt_screenshot")
+            return
+
+        if name == "ptrToInt" or name == "intToPtr":
+            # 纯类型层 cast：值已在 RAX，无机器码
+            self.eval(e.args[0])
             return
 
         raise CodegenError(f"未实现的内置函数 {name}")

@@ -1,0 +1,16 @@
+actor Main {
+    src: Ptr
+    limit: Int = 0
+    pos: Int = 0
+
+    def peek[o: Int] -> Int {
+        if pos + o >= limit {
+            return 0
+        }
+        return 1
+    }
+
+    on Start {
+        print(1)
+    }
+}

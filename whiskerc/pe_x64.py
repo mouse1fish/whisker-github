@@ -38,7 +38,9 @@ class PEBuilder:
         self.dll = dll
         self.rdata: list[_Item] = []
         self.data: list[_Item] = []
-        self.imports: list[str] = []
+        self.imports: list[str] = []          # 全部导入函数的扁平有序清单（= IAT 槽位顺序）
+        self.func_dll: dict[str, str] = {}    # 函数名 -> 所属 DLL
+        self.dll_order: list[str] = []        # DLL 的出现顺序（描述符按此排布）
 
     # ---------- 数据项登记 ----------
     def rdata_item(self, label: str, data: bytes, align: int = 1) -> _Item:
@@ -51,12 +53,17 @@ class PEBuilder:
         self.data.append(it)
         return it
 
-    def declare_imports(self, funcs: list[str]) -> None:
-        """声明需要导入的函数；可多次调用，构建时合并成一张导入表。
-        每个函数会在 .data 里得到一个 imp_<名字> 的 8 字节槽位标签。"""
+    def declare_imports(self, funcs: list[str], dll: str | None = None) -> None:
+        """声明需要导入的函数；可多次调用（可用 dll 参数指定不同 DLL，如 ws2_32.dll），
+        构建时合并成一张导入表。每个函数会在 .data 里得到一个 imp_<名字> 的 8 字节槽位标签。"""
+        if dll is None:
+            dll = self.dll
         for f in funcs:
             if f not in self.imports:
                 self.imports.append(f)
+                self.func_dll[f] = dll
+                if dll not in self.dll_order:
+                    self.dll_order.append(dll)
 
     # ---------- 布局 ----------
     @staticmethod
@@ -72,16 +79,25 @@ class PEBuilder:
         return off, table
 
     def _build_import_items(self) -> None:
-        """按最终函数清单生成 IAT / ILT / 描述符 / hint-name / dll 名（只做一次）"""
+        """按最终函数清单生成 IAT / ILT / 描述符 / hint-name / dll 名（只做一次）。
+        多 DLL 布局（extract_runtime.py 与 tools/wkcc.wk 的 buildPe 必须保持一致）：
+          - IAT：.data 里一张连续表，所有函数按 imports 扁平顺序排槽，末尾一个全零槽
+          - 描述符数组：每个 DLL 一项 + 一个全零终止项（20 字节/项）
+          - 每个 DLL 一张自己的 ILT（OriginalFirstThunk）+ 一个 DLL 名字符串
+          - hint-name 每个函数一条
+        """
         if not self.imports or any(it.label == "__iat__" for it in self.data):
             return
         n = len(self.imports)
         iat = self.data_item("__iat__", b"\x00" * (8 * (n + 1)), 8)
         for i, f in enumerate(self.imports):
             iat.sublabels.append((8 * i, "imp_" + f))
-        self.rdata_item("__ilt__", b"\x00" * (8 * (n + 1)), 8)
-        self.rdata_item("__dllname__", self.dll.encode() + b"\x00", 2)
-        self.rdata_item("__idesc__", b"\x00" * (20 * 2), 8)
+        ndll = len(self.dll_order)
+        self.rdata_item("__idesc__", b"\x00" * (20 * (ndll + 1)), 8)
+        for d in self.dll_order:
+            fns = [f for f in self.imports if self.func_dll[f] == d]
+            self.rdata_item("__ilt_" + d + "__", b"\x00" * (8 * (len(fns) + 1)), 8)
+            self.rdata_item("__dllname_" + d + "__", d.encode() + b"\x00", 2)
         for f in self.imports:
             self.rdata_item("hint_" + f, struct.pack("<H", 0) + f.encode() + b"\x00", 2)
 
@@ -119,17 +135,24 @@ class PEBuilder:
         if self.imports:
             n = len(self.imports)
             iat_item = next(it for it in self.data if it.label == "__iat__")
-            ilt_item = next(it for it in self.rdata if it.label == "__ilt__")
             idesc_item = next(it for it in self.rdata if it.label == "__idesc__")
-            ilt_rva = rdata_rva + rdata_off["__ilt__"]
             iat_rva = data_rva + data_off["__iat__"]
-            for i, f in enumerate(self.imports):
-                entry = rdata_rva + rdata_off["hint_" + f]
-                struct.pack_into("<Q", ilt_item.data, 8 * i, entry)
-                struct.pack_into("<Q", iat_item.data, 8 * i, entry)
-            struct.pack_into("<IIIII", idesc_item.data, 0,
-                             ilt_rva, 0, 0, rdata_rva + rdata_off["__dllname__"], iat_rva)
-            import_dir = (rdata_rva + rdata_off["__idesc__"], 20 * 2)
+            slot_of = {f: i for i, f in enumerate(self.imports)}
+            for di, d in enumerate(self.dll_order):
+                fns = [f for f in self.imports if self.func_dll[f] == d]
+                ilt_item = next(it for it in self.rdata if it.label == "__ilt_" + d + "__")
+                ilt_rva = rdata_rva + rdata_off["__ilt_" + d + "__"]
+                for j, f in enumerate(fns):
+                    entry = rdata_rva + rdata_off["hint_" + f]
+                    struct.pack_into("<Q", ilt_item.data, 8 * j, entry)
+                    struct.pack_into("<Q", iat_item.data, 8 * slot_of[f], entry)
+                first_thunk = iat_rva + 8 * slot_of[fns[0]]
+                struct.pack_into("<IIIII", idesc_item.data, 20 * di,
+                                 ilt_rva, 0, 0,
+                                 rdata_rva + rdata_off["__dllname_" + d + "__"],
+                                 first_thunk)
+            import_dir = (rdata_rva + rdata_off["__idesc__"],
+                          20 * (len(self.dll_order) + 1))
             iat_dir = (iat_rva, 8 * (n + 1))
         else:
             import_dir = (0, 0)

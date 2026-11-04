@@ -1,0 +1,8 @@
+actor Main {
+    def f[x: Int] -> Int {
+        return x
+    }
+    on Start {
+        print(1)
+    }
+}

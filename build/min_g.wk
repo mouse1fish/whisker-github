@@ -1,0 +1,10 @@
+actor Main {
+    src: Ptr
+    limit: Int = 0
+    tkKind: Int[65536]
+    tkText: Str[65536]
+    pos: Int = 0
+    on Start {
+        print(1)
+    }
+}

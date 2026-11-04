@@ -1,0 +1,3 @@
+块前 hProcess=472 hPipe=440
+读1=4 块中 hProcess=0 hPipe=4
+读2=-1 块后 hProcess=259 hPipe=4

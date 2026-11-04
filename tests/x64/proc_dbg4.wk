@@ -1,0 +1,13 @@
+# proc_dbg4.wk —— spawn 后先 wait 再 read，隔离句柄有效性
+actor Main {
+    on Start {
+        p: Ptr = procSpawnPipe("cmd.exe /c echo HI")
+        print("hProcess=", load64(p))
+        c: Int = procWait(p)
+        print("退出码=", c)
+        buf: Ptr = alloc(64)
+        n: Int = procRead(p, buf, 63)
+        print("read=", n)
+        print("完成")
+    }
+}

@@ -34,6 +34,36 @@ BUILTIN_SIGS: dict[str, tuple[list[Ty], Ty]] = {
     "ptrToStr": ([PTR_TY], STR_TY),                 # Ptr -> Str（同上，显式桥接）
     "readBytes": ([STR_TY, PTR_TY, INT_TY], INT_TY),    # 读文件到指针（返回字节数/-1）
     "writeBytes": ([STR_TY, PTR_TY, INT_TY], INT_TY),   # 指针内容写文件（返回字节数/-1）
+    # ---- 系统原语（EonOS 地基）----
+    "sleepMs": ([INT_TY], VOID_TY),                     # 睡眠指定毫秒
+    "wallMs": ([], INT_TY),                             # 系统墙钟毫秒（GetTickCount64）
+    "netInit": ([], INT_TY),                            # 初始化 Winsock（0 成功/-1 失败）
+    "netErr": ([], INT_TY),                             # 最近一次 Winsock 错误码
+    "netListen": ([INT_TY], INT_TY),                    # 监听端口 -> 监听 socket/-1\n    "netListenLocal": ([INT_TY], INT_TY),               # 仅绑定 127.0.0.1 的监听 -> socket/-1
+    "netAccept": ([INT_TY], INT_TY),                    # 接受连接 -> 客户端 socket/-1（阻塞）
+    "netConnect": ([STR_TY, INT_TY], INT_TY),           # 连接 IPv4 点分地址 -> socket/-1
+    "netSend": ([INT_TY, PTR_TY, INT_TY], INT_TY),      # 发送（socket, 缓冲, 长度）
+    "netRecv": ([INT_TY, PTR_TY, INT_TY], INT_TY),      # 接收（0=对端关闭/-1 错误）
+    "netClose": ([INT_TY], INT_TY),                     # 关闭 socket
+    "procSpawn": ([STR_TY], PTR_TY),                    # 启动进程（继承控制台）-> 进程块/NULL
+    "procSpawnPipe": ([STR_TY], PTR_TY),                # 启动进程并接管 stdout+stderr -> 进程块/NULL
+    "procRead": ([PTR_TY, PTR_TY, INT_TY], INT_TY),     # 读子进程输出（0=EOF/-1）
+    "procWait": ([PTR_TY], INT_TY),                     # 等待退出 -> 退出码/-1
+    "procFree": ([PTR_TY], VOID_TY),                    # 关闭进程块里的句柄
+    # ---- agent 原语（EonOS：屏幕/鼠标/键盘）----
+    "screenW": ([], INT_TY),                            # 屏幕宽
+    "screenH": ([], INT_TY),                            # 屏幕高
+    "mouseX": ([], INT_TY),                             # 光标 X
+    "mouseY": ([], INT_TY),                             # 光标 Y
+    "mouseMove": ([INT_TY, INT_TY], INT_TY),            # 移动光标
+    "mouseDown": ([INT_TY], INT_TY),                    # 按下（1 左/2 右/3 中）
+    "mouseUp": ([INT_TY], INT_TY),                      # 抬起
+    "keyDown": ([INT_TY], INT_TY),                      # 按下虚拟键码
+    "keyUp": ([INT_TY], INT_TY),                        # 抬起虚拟键码
+    "keyVk": ([INT_TY], INT_TY),                        # 字符 -> VK（低字节 VK，高字节 shift）
+    "screenshot": ([STR_TY], INT_TY),                   # 截屏写 BMP 文件
+    "ptrToInt": ([PTR_TY], INT_TY),                     # 指针 -> 整数（身份变换，句柄/地址算术用）
+    "intToPtr": ([INT_TY], PTR_TY),                     # 整数 -> 指针（身份变换）
 }
 
 

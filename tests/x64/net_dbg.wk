@@ -1,0 +1,29 @@
+# net_dbg.wk —— 单线程自连接诊断：listen → connect 自己 → accept → 收发
+actor Main {
+    on Start {
+        r0: Int = netInit()
+        print("netInit=", r0)
+        ls: Int = netListen(47233)
+        print("listen=", ls)
+        s: Int = netConnect("127.0.0.1", 47233)
+        print("connect=", s, " err=", netErr())
+        if s >= 0 {
+            cs: Int = netAccept(ls)
+            print("accept=", cs)
+            msg: Str = "ping"
+            n: Int = netSend(s, strPtr(msg), strLen(msg))
+            print("send=", n, " err=", netErr())
+            b: Ptr = alloc(64)
+            r: Int = netRecv(cs, b, 63)
+            print("recv=", r)
+            if r > 0 {
+                store8(ptrAdd(b, r), 0)
+                print("内容=", ptrToStr(b))
+            }
+            netClose(cs)
+            netClose(s)
+        }
+        netClose(ls)
+        print("完成")
+    }
+}

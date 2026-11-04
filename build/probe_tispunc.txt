@@ -1,0 +1,410 @@
+[dbg1] setup ok
+[dbg2] loadSrc=72 bytes
+[dbg3] blob read=20848
+[dbg4] bufs ok
+[dbg] token count=24
+[tok] 0 kind=3 text=actor
+[tok] 1 kind=2 text=Main
+[tok] 2 kind=4 text={
+[tok] 3 kind=5 text=
+[tok] 4 kind=2 text=limit
+[tok] 5 kind=4 text=:
+[tok] 6 kind=2 text=Int
+[tok] 7 kind=4 text==
+[tok] 8 kind=0 text=0
+[tok] 9 kind=5 text=
+[tok] 10 kind=3 text=on
+[tok] 11 kind=2 text=Start
+[tok] 12 kind=4 text={
+[tok] 13 kind=5 text=
+[tok] 14 kind=2 text=print
+[tok] 15 kind=4 text=(
+[tok] 16 kind=0 text=1
+[tok] 17 kind=4 text=)
+[tok] 18 kind=5 text=
+[tok] 19 kind=4 text=}
+[tok] 20 kind=5 text=
+[tok] 21 kind=4 text=}
+[tok] 22 kind=5 text=
+[tok] 23 kind=6 text=<eof>
+== 进程创建 ImageBase=0x140000000
+== loader 断点，int3 写入 0x140004D3B ok=1
+== 命中#0 RIP=0x140004D3C RAX=5368780784 RCX=0x62E0000 RDX=0x1400117F0 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140007379 (RVA 0x7379)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'{\x00}\x00def\x00'
+== 命中#1 RIP=0x140004D3C RAX=5368780786 RCX=0x62E0000 RDX=0x1400117F2 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x1400073C5 (RVA 0x73C5)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00def\x00{\x00'
+== 命中#2 RIP=0x140004D3C RAX=5368780784 RCX=0x62E0000 RDX=0x1400117F0 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140007379 (RVA 0x7379)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'{\x00}\x00def\x00'
+== 命中#3 RIP=0x140004D3C RAX=5368780786 RCX=0x62E0000 RDX=0x1400117F2 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x1400073C5 (RVA 0x73C5)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00def\x00{\x00'
+== 命中#4 RIP=0x140004D3C RAX=5368780784 RCX=0x62E0000 RDX=0x1400117F0 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140007379 (RVA 0x7379)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'{\x00}\x00def\x00'
+== 命中#5 RIP=0x140004D3C RAX=5368780786 RCX=0x62E0000 RDX=0x1400117F2 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x1400073C5 (RVA 0x73C5)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00def\x00{\x00'
+== 命中#6 RIP=0x140004D3C RAX=5368780784 RCX=0x62E0000 RDX=0x1400117F0 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140007379 (RVA 0x7379)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'{\x00}\x00def\x00'
+== 命中#7 RIP=0x140004D3C RAX=5368780786 RCX=0x62E0000 RDX=0x1400117F2 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x1400073C5 (RVA 0x73C5)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00def\x00{\x00'
+== 命中#8 RIP=0x140004D3C RAX=5368780784 RCX=0x62E0000 RDX=0x1400117F0 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140007379 (RVA 0x7379)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'{\x00}\x00def\x00'
+== 命中#9 RIP=0x140004D3C RAX=5368780786 RCX=0x62E0000 RDX=0x1400117F2 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x1400073C5 (RVA 0x73C5)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00def\x00{\x00'
+== 命中#10 RIP=0x140004D3C RAX=5368780784 RCX=0x62E0000 RDX=0x1400117F0 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140007379 (RVA 0x7379)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'{\x00}\x00def\x00'
+== 命中#11 RIP=0x140004D3C RAX=5368780786 RCX=0x62E0000 RDX=0x1400117F2 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x1400073C5 (RVA 0x73C5)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00def\x00{\x00'
+== 命中#12 RIP=0x140004D3C RAX=5368780784 RCX=0x62E0000 RDX=0x1400117F0 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140007379 (RVA 0x7379)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'{\x00}\x00def\x00'
+== 命中#13 RIP=0x140004D3C RAX=5368780786 RCX=0x62E0000 RDX=0x1400117F2 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x1400073C5 (RVA 0x73C5)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00def\x00{\x00'
+== 命中#14 RIP=0x140004D3C RAX=5368780784 RCX=0x62E0000 RDX=0x1400117F0 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140007379 (RVA 0x7379)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'{\x00}\x00def\x00'
+== 命中#15 RIP=0x140004D3C RAX=5368780786 RCX=0x62E0000 RDX=0x1400117F2 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x1400073C5 (RVA 0x73C5)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00def\x00{\x00'
+== 命中#16 RIP=0x140004D3C RAX=5368780784 RCX=0x62E0000 RDX=0x1400117F0 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140007379 (RVA 0x7379)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'{\x00}\x00def\x00'
+== 命中#17 RIP=0x140004D3C RAX=5368780784 RCX=0x62E0000 RDX=0x1400117F0 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140007379 (RVA 0x7379)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'{\x00}\x00def\x00'
+== 命中#18 RIP=0x140004D3C RAX=5368780786 RCX=0x62E0000 RDX=0x1400117F2 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x1400073C5 (RVA 0x73C5)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00def\x00{\x00'
+== 命中#19 RIP=0x140004D3C RAX=5368780784 RCX=0x62E0000 RDX=0x1400117F0 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140007379 (RVA 0x7379)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'{\x00}\x00def\x00'
+== 命中#20 RIP=0x140004D3C RAX=5368780786 RCX=0x62E0000 RDX=0x1400117F2 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x1400073C5 (RVA 0x73C5)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00def\x00{\x00'
+== 命中#21 RIP=0x140004D3C RAX=5368780784 RCX=0x62E0000 RDX=0x1400117F0 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140007379 (RVA 0x7379)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'{\x00}\x00def\x00'
+== 命中#22 RIP=0x140004D3C RAX=5368780786 RCX=0x62E0000 RDX=0x1400117F2 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x1400073C5 (RVA 0x73C5)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00def\x00{\x00'
+== 命中#23 RIP=0x140004D3C RAX=5368780784 RCX=0x62E0000 RDX=0x1400117F0 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140007379 (RVA 0x7379)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'{\x00}\x00def\x00'
+== 命中#24 RIP=0x140004D3C RAX=5368780786 RCX=0x62E0000 RDX=0x1400117F2 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x1400073C5 (RVA 0x73C5)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00def\x00{\x00'
+== 命中#25 RIP=0x140004D3C RAX=5368780784 RCX=0x62E0000 RDX=0x1400117F0 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140007379 (RVA 0x7379)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'{\x00}\x00def\x00'
+== 命中#26 RIP=0x140004D3C RAX=5368780786 RCX=0x62E0000 RDX=0x1400117F2 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x1400073C5 (RVA 0x73C5)[pa] prescan done pi=4 fnCount=0
+[pa] loop pi=4 tok=limit
+[wkcc] 期望 { 遇到 Int
+[wkcc] pi=7 语句结束处需要换行（附近：=）
+[ctx]  | limit | : | Int | = | 0
+
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00def\x00{\x00'
+== 命中#27 RIP=0x140004D3C RAX=5368780784 RCX=0x62E0000 RDX=0x1400117F0 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140007379 (RVA 0x7379)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'{\x00}\x00def\x00'
+== 命中#28 RIP=0x140004D3C RAX=5368780786 RCX=0x62E0000 RDX=0x1400117F2 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x1400073C5 (RVA 0x73C5)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00def\x00{\x00'
+== 命中#29 RIP=0x140004D3C RAX=5368780784 RCX=0x62E0000 RDX=0x1400117F0 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140007379 (RVA 0x7379)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'{\x00}\x00def\x00'
+== 命中#30 RIP=0x140004D3C RAX=5368780786 RCX=0x62E0000 RDX=0x1400117F2 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x1400073C5 (RVA 0x73C5)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00def\x00{\x00'
+== 命中#31 RIP=0x140004D3C RAX=5368780784 RCX=0x62E0000 RDX=0x1400117F0 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140007379 (RVA 0x7379)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'{\x00}\x00def\x00'
+== 命中#32 RIP=0x140004D3C RAX=5368780786 RCX=0x62E0000 RDX=0x1400117F2 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x1400073C5 (RVA 0x73C5)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00def\x00{\x00'
+== 命中#33 RIP=0x140004D3C RAX=5368780784 RCX=0x62E0000 RDX=0x1400117F0 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140007379 (RVA 0x7379)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'{\x00}\x00def\x00'
+== 命中#34 RIP=0x140004D3C RAX=5368780786 RCX=0x62E0000 RDX=0x1400117F2 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB18 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x1400073C5 (RVA 0x73C5)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00def\x00{\x00'
+== 命中#35 RIP=0x140004D3C RAX=5368780850 RCX=0x62E0000 RDX=0x140011832 RBX=0x62E0000 RBP=0x23DFDC0 RSP=0x23DFB78 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140007958 (RVA 0x7958)
+   [rbp+0] = 37617184
+   [rbp+0] = 37617184
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00[pa] l'
+== 命中#36 RIP=0x140004D3C RAX=5368781035 RCX=0x62E0000 RDX=0x1400118EB RBX=0x62E0000 RBP=0x23DFB20 RSP=0x23DFAD8 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x1400095D2 (RVA 0x95D2)
+   [rbp+0] = 37616496
+   [rbp+0] = 37616496
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'[\x00]\x00:\x00Ac'
+== 命中#37 RIP=0x140004D3C RAX=5368780978 RCX=0x62E0000 RDX=0x1400118B2 RBX=0x62E0000 RBP=0x23DFB70 RSP=0x23DFB28 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140008C6A (RVA 0x8C6A)
+   [rbp+0] = 37617088
+   [rbp+0] = 37617088
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'->\x00Actor'
+== 命中#38 RIP=0x140004D3C RAX=5368781085 RCX=0x62E0000 RDX=0x14001191D RBX=0x62E0000 RBP=0x23DFB20 RSP=0x23DFAF8 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140009945 (RVA 0x9945)
+   [rbp+0] = 37616496
+   [rbp+0] = 37616496
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00}\x00var\x00'
+== 命中#39 RIP=0x140004D3C RAX=5368781470 RCX=0x62E0000 RDX=0x140011A9E RBX=0x62E0000 RBP=0x23DF810 RSP=0x23DF7E8 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x14000BCE6 (RVA 0xBCE6)
+   [rbp+0] = 37615696
+   [rbp+0] = 37615696
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'(\x00)\x00-\x00!\x00'
+== 命中#40 RIP=0x140004D3C RAX=5368781474 RCX=0x62E0000 RDX=0x140011AA2 RBX=0x62E0000 RBP=0x23DF810 RSP=0x23DF7E8 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x14000BD33 (RVA 0xBD33)
+   [rbp+0] = 37615696
+   [rbp+0] = 37615696
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'-\x00!\x00not\x00'
+== 命中#41 RIP=0x140004D3C RAX=5368781476 RCX=0x62E0000 RDX=0x140011AA4 RBX=0x62E0000 RBP=0x23DF810 RSP=0x23DF7E8 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x14000BDA2 (RVA 0xBDA2)
+   [rbp+0] = 37615696
+   [rbp+0] = 37615696
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'!\x00not\x00[\x00'
+== 命中#42 RIP=0x140004D3C RAX=5368781482 RCX=0x62E0000 RDX=0x140011AAA RBX=0x62E0000 RBP=0x23DF7E0 RSP=0x23DF798 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x14000C110 (RVA 0xC110)
+   [rbp+0] = 37615632
+   [rbp+0] = 37615632
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'[\x00\xe4\xb8\x8b\xe6\xa0\x87'
+== 命中#43 RIP=0x140004D3C RAX=5368781511 RCX=0x62E0000 RDX=0x140011AC7 RBX=0x62E0000 RBP=0x23DF7E0 RSP=0x23DF798 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x14000C2BC (RVA 0xC2BC)
+   [rbp+0] = 37615632
+   [rbp+0] = 37615632
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'.\x00(\x00(\x00)\x00'
+== 命中#44 RIP=0x140004D3C RAX=5368780359 RCX=0x62E0000 RDX=0x140011647 RBX=0x62E0000 RBP=0x23DFA00 RSP=0x23DF9C8 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140005052 (RVA 0x5052)
+   [rbp+0] = 37616256
+   [rbp+0] = 37616256
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b';\x00}\x00\xe8\xaf\xad\xe5'
+== 命中#45 RIP=0x140004D3C RAX=5368780361 RCX=0x62E0000 RDX=0x140011649 RBX=0x62E0000 RBP=0x23DFA00 RSP=0x23DF9C8 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x1400050DD (RVA 0x50DD)
+   [rbp+0] = 37616256
+   [rbp+0] = 37616256
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00\xe8\xaf\xad\xe5\x8f\xa5'
+== 命中#46 RIP=0x140004D3C RAX=5368781085 RCX=0x62E0000 RDX=0x14001191D RBX=0x62E0000 RBP=0x23DFB20 RSP=0x23DFAF8 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140009945 (RVA 0x9945)
+   [rbp+0] = 37616496
+   [rbp+0] = 37616496
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00}\x00var\x00'
+== 命中#47 RIP=0x140004D3C RAX=5368781470 RCX=0x62E0000 RDX=0x140011A9E RBX=0x62E0000 RBP=0x23DF810 RSP=0x23DF7E8 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x14000BCE6 (RVA 0xBCE6)
+   [rbp+0] = 37615696
+   [rbp+0] = 37615696
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'(\x00)\x00-\x00!\x00'
+== 命中#48 RIP=0x140004D3C RAX=5368781474 RCX=0x62E0000 RDX=0x140011AA2 RBX=0x62E0000 RBP=0x23DF810 RSP=0x23DF7E8 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x14000BD33 (RVA 0xBD33)
+   [rbp+0] = 37615696
+   [rbp+0] = 37615696
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'-\x00!\x00not\x00'
+== 命中#49 RIP=0x140004D3C RAX=5368781476 RCX=0x62E0000 RDX=0x140011AA4 RBX=0x62E0000 RBP=0x23DF810 RSP=0x23DF7E8 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x14000BDA2 (RVA 0xBDA2)
+   [rbp+0] = 37615696
+   [rbp+0] = 37615696
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'!\x00not\x00[\x00'
+== 命中#50 RIP=0x140004D3C RAX=5368781482 RCX=0x62E0000 RDX=0x140011AAA RBX=0x62E0000 RBP=0x23DF7E0 RSP=0x23DF798 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x14000C110 (RVA 0xC110)
+   [rbp+0] = 37615632
+   [rbp+0] = 37615632
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'[\x00\xe4\xb8\x8b\xe6\xa0\x87'
+== 命中#51 RIP=0x140004D3C RAX=5368781511 RCX=0x62E0000 RDX=0x140011AC7 RBX=0x62E0000 RBP=0x23DF7E0 RSP=0x23DF798 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x14000C2BC (RVA 0xC2BC)
+   [rbp+0] = 37615632
+   [rbp+0] = 37615632
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'.\x00(\x00(\x00)\x00'
+== 命中#52 RIP=0x140004D3C RAX=5368780359 RCX=0x62E0000 RDX=0x140011647 RBX=0x62E0000 RBP=0x23DFA00 RSP=0x23DF9C8 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140005052 (RVA 0x5052)
+   [rbp+0] = 37616256
+   [rbp+0] = 37616256
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b';\x00}\x00\xe8\xaf\xad\xe5'
+== 命中#53 RIP=0x140004D3C RAX=5368780359 RCX=0x62E0000 RDX=0x140011647 RBX=0x62E0000 RBP=0x23DFA00 RSP=0x23DF9C8 (RSP%16=8)[wkcc] pi=10 表达式里出现意外的关键字（附近：on）
+[ctx] Int | = | 0 |  | on | Start
+[wkcc] pi=11 语句结束处需要换行（附近：Start）
+[ctx] = | 0 |  | on | Start | {
+[wkcc] pi=12 语句结束处需要换行（附近：{）
+[ctx] 0 |  | on | Start | { | 
+[dbg6] parse ok, cw=166
+[dbg7] resolveFx ok, nfix=1
+[fnmap] : rva=8192
+[hc] hcount=0 fnCount=1
+[fldcount] 0 fxCount=1 count=24
+selfhost.exe 写出 = 23552 字节
+[dbg8] buildPe done
+
+   [rsp+0] 返回地址 = 0x140005052 (RVA 0x5052)
+   [rbp+0] = 37616256
+   [rbp+0] = 37616256
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b';\x00}\x00\xe8\xaf\xad\xe5'
+== 命中#54 RIP=0x140004D3C RAX=5368781085 RCX=0x62E0000 RDX=0x14001191D RBX=0x62E0000 RBP=0x23DFB20 RSP=0x23DFAF8 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x140009945 (RVA 0x9945)
+   [rbp+0] = 37616496
+   [rbp+0] = 37616496
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'}\x00}\x00var\x00'
+== 命中#55 RIP=0x140004D3C RAX=5368781470 RCX=0x62E0000 RDX=0x140011A9E RBX=0x62E0000 RBP=0x23DF810 RSP=0x23DF7E8 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x14000BCE6 (RVA 0xBCE6)
+   [rbp+0] = 37615696
+   [rbp+0] = 37615696
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'(\x00)\x00-\x00!\x00'
+== 命中#56 RIP=0x140004D3C RAX=5368781474 RCX=0x62E0000 RDX=0x140011AA2 RBX=0x62E0000 RBP=0x23DF810 RSP=0x23DF7E8 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x14000BD33 (RVA 0xBD33)
+   [rbp+0] = 37615696
+   [rbp+0] = 37615696
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'-\x00!\x00not\x00'
+== 命中#57 RIP=0x140004D3C RAX=5368781476 RCX=0x62E0000 RDX=0x140011AA4 RBX=0x62E0000 RBP=0x23DF810 RSP=0x23DF7E8 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x14000BDA2 (RVA 0xBDA2)
+   [rbp+0] = 37615696
+   [rbp+0] = 37615696
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'!\x00not\x00[\x00'
+== 命中#58 RIP=0x140004D3C RAX=5368781482 RCX=0x62E0000 RDX=0x140011AAA RBX=0x62E0000 RBP=0x23DF7E0 RSP=0x23DF798 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x14000C110 (RVA 0xC110)
+   [rbp+0] = 37615632
+   [rbp+0] = 37615632
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'[\x00\xe4\xb8\x8b\xe6\xa0\x87'
+== 命中#59 RIP=0x140004D3C RAX=5368781511 RCX=0x62E0000 RDX=0x140011AC7 RBX=0x62E0000 RBP=0x23DF7E0 RSP=0x23DF798 (RSP%16=8)
+   [rsp+0] 返回地址 = 0x14000C2BC (RVA 0xC2BC)
+   [rbp+0] = 37615632
+   [rbp+0] = 37615632
+   [RCX] -> b'\xa4\xf6\x00@\x01\x00\x00\x00'
+   [RDX] -> b'.\x00(\x00(\x00)\x00'
+== 进程退出 code=0x0

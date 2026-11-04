@@ -1,0 +1,215 @@
+[dbg1] setup ok
+[dbg2] loadSrc=144 bytes
+[dbg3] blob read=20848
+[dbg4] bufs ok
+== 进程创建 ImageBase=0x140000000
+== loader 断点，int3 写入 0x1400044DA ok=1
+== 命中#0 RIP=0x1400044DB RAX=899 RCX=0x62A0000 RDX=0x0 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> b'\x89\xef\x00@\x01\x00\x00\x00'
+   [RDX] -> 读取失败 err=299
+== 命中#1 RIP=0x1400044DB RAX=0 RCX=0x0 RDX=0x43 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#2 RIP=0x1400044DB RAX=0 RCX=0x0 RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#3 RIP=0x1400044DB RAX=0 RCX=0x1 RDX=0x3 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#4 RIP=0x1400044DB RAX=0 RCX=0x4A RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#5 RIP=0x1400044DB RAX=0 RCX=0x2 RDX=0x2 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#6 RIP=0x1400044DB RAX=0 RCX=0x4F RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#7 RIP=0x1400044DB RAX=0 RCX=0x50 RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#8 RIP=0x1400044DB RAX=0 RCX=0x51 RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#9 RIP=0x1400044DB RAX=0 RCX=0x4 RDX=0x5 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#10 RIP=0x1400044DB RAX=0 RCX=0x53 RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#11 RIP=0x1400044DB RAX=0 RCX=0x54 RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#12 RIP=0x1400044DB RAX=0 RCX=0x55 RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#13 RIP=0x1400044DB RAX=0 RCX=0x56 RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#14 RIP=0x1400044DB RAX=0 RCX=0x5 RDX=0x3 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#15 RIP=0x1400044DB RAX=0 RCX=0x59 RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#16 RIP=0x1400044DB RAX=0 RCX=0x6 RDX=0x2 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#17 RIP=0x1400044DB RAX=0 RCX=0x5F RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#18 RIP=0x1400044DB RAX=0 RCX=0x60 RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#19 RIP=0x1400044DB RAX=0 RCX=0x61 RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#20 RIP=0x1400044DB RAX=0 RCX=0x8 RDX=0x5 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#21 RIP=0x1400044DB RAX=0 RCX=0x63 RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#22 RIP=0x1400044DB RAX=0 RCX=0x64 RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#23 RIP=0x1400044DB RAX=0 RCX=0x65 RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#24 RIP=0x1400044DB RAX=0 RCX=0x66 RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#25 RIP=0x1400044DB RAX=0 RCX=0x67 RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#26 RIP=0x1400044DB RAX=0 RCX=0x68 RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#27 RIP=0x1400044DB RAX=0 RCX=0x69 RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#28 RIP=0x1400044DB RAX=0 RCX=0x6A RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#29 RIP=0x1400044DB RAX=0 RCX=0x9 RDX=0x2 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#30 RIP=0x1400044DB RAX=0 RCX=0x70 RDX=0x1 RBX=0x62A0000 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+== 命中#31 RIP=0x1400044DB RAX=0 RCX=0xB RDX=0x1 RBX=0x13 RBP=0x239DE70 RSP=0x239CE60 (RSP%16=0)
+   [rbp+0] = 37351056
+   [rbp+0] = 37351056
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+   [exc] 0xC0000005 @ 0x1400044DA
+   RIP=0x1400044DA RAX=0 RCX=0xB RDX=0x1 RBX=0x13 RSP=0x239CE60 RBP=0x239DE70
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+   [RBP+8] 返回地址 = 0x14000673F（RVA 0x673F）
+   actor.count 读取失败
+   actor.pi 读取失败
+   actor.kws_off 读取失败
+   [rsp+0x00] = 0x62A0000 (103415808)
+   [rsp+0x08] = 0x42 (66)
+   [rsp+0x10] = 0x0 (0)
+   [rsp+0x18] = 0x510000 (5308416)
+   [rsp+0x20] = 0x0 (0)
+   [rsp+0x28] = 0x0 (0)
+   [rsp+0x30] = 0x7 (7)
+   [rsp+0x38] = 0x0 (0)
+   [rsp+0x40] = 0x0 (0)
+   [rsp+0x48] = 0x0 (0)
+   [rsp+0x50] = 0x0 (0)
+   [rsp+0x58] = 0x0 (0)
+   [rsp+0x60] = 0x0 (0)
+   [rsp+0x68] = 0x7 (7)
+   [rsp+0x70] = 0x0 (0)
+   [rsp+0x78] = 0x0 (0)
+   [exc] 0xC0000005 @ 0x1400044DA
+   RIP=0x1400044DA RAX=0 RCX=0xB RDX=0x1 RBX=0x13 RSP=0x239CE60 RBP=0x239DE70
+   [RCX] -> 读取失败 err=299
+   [RDX] -> 读取失败 err=299
+   [RBP+8] 返回地址 = 0x14000673F（RVA 0x673F）
+   actor.count 读取失败
+   actor.pi 读取失败
+   actor.kws_off 读取失败
+   [rsp+0x00] = 0x62A0000 (103415808)
+   [rsp+0x08] = 0x42 (66)
+   [rsp+0x10] = 0x0 (0)
+   [rsp+0x18] = 0x510000 (5308416)
+   [rsp+0x20] = 0x0 (0)
+   [rsp+0x28] = 0x0 (0)
+   [rsp+0x30] = 0x7 (7)
+   [rsp+0x38] = 0x0 (0)
+   [rsp+0x40] = 0x0 (0)
+   [rsp+0x48] = 0x0 (0)
+   [rsp+0x50] = 0x0 (0)
+   [rsp+0x58] = 0x0 (0)
+   [rsp+0x60] = 0x0 (0)
+   [rsp+0x68] = 0x7 (7)
+   [rsp+0x70] = 0x0 (0)
+   [rsp+0x78] = 0x0 (0)
+== 进程退出 code=0xC0000005

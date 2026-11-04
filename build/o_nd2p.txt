@@ -1,0 +1,16 @@
+M: start
+M: spawn Server 完成
+M: spawn Client 完成
+M: SetClient 已发
+S: SetClient 完成
+M: Listen 已发
+S: Listen 开始 port=47231
+S: ls=468
+S: 等待 accept
+C: 收到 Listening 468
+C: connect=484
+S: accept=472
+C: 发送 17 字节
+S: 收到 17 字节
+C: 收到 17 字节
+C: 回显=hello-whisker-net

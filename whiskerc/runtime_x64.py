@@ -22,6 +22,8 @@
 """
 from __future__ import annotations
 
+import struct
+
 from .asm_x64 import (R8, R9, R10, R11, RAX, RBP, RCX, RDI, RDX, RSI, RSP, Asm)
 from .pe_x64 import PEBuilder
 
@@ -44,7 +46,19 @@ IMPORTS = ["GetStdHandle", "WriteFile", "VirtualAlloc",
            "QueryPerformanceCounter", "QueryPerformanceFrequency",
            "CreateThread", "GetSystemInfo", "Sleep", "ExitProcess", "TerminateProcess",
            "CreateEventA", "SetEvent", "WaitForSingleObject",
-           "CreateFileA", "ReadFile", "CloseHandle"]
+           "CreateFileA", "ReadFile", "CloseHandle",
+           "GetTickCount64", "CreateProcessA", "GetExitCodeProcess",
+           "CreatePipe", "SetHandleInformation"]
+
+# Winsock2：网络原语走 ws2_32.dll（导入表已支持多 DLL）
+WS2_IMPORTS = ["WSAStartup", "socket", "inet_addr", "htons", "bind", "listen",
+               "accept", "connect", "send", "recv", "closesocket", "WSAGetLastError"]
+
+# agent 原语（EonOS：屏幕捕获 / 鼠标 / 键盘）
+USER32_IMPORTS = ["GetDC", "ReleaseDC", "GetSystemMetrics", "SetCursorPos",
+                  "mouse_event", "keybd_event", "VkKeyScanA", "GetCursorPos"]
+GDI32_IMPORTS = ["CreateCompatibleDC", "CreateCompatibleBitmap", "SelectObject",
+                 "BitBlt", "GetDIBits", "DeleteDC", "DeleteObject"]
 
 
 def _frame_size(nslots: int, nextra: int = 0) -> int:
@@ -68,6 +82,7 @@ class Frame:
         a.mov_rr(RBP, RSP)
         for r in self.saved:
             a.push_r(r)
+        a.align_rsp()               # 动态对齐：嵌套调用可能以未对齐 rsp 进入本函数
         self.patch_off = a.sub_rsp_placeholder()
 
     def alloc(self) -> int:
@@ -79,10 +94,9 @@ class Frame:
     def size(self) -> int:
         """帧大小：要装下 shadow + 栈传参数 + 局部槽，并让 rsp 在调用点 16 字节对齐"""
         f = 32 + 8 * self.nextra + 8 * self.nslots
-        want = (8 * len(self.saved)) % 16
-        while f % 16 != want:
-            f += 8
-        return f
+        # 2026-11-02：序言已 and rsp,-16（rsp 恒 16 对齐），sub 量须为 16 的倍数，
+        # 否则帧内调用点 rsp≡8（奇偶校验旧逻辑在动态对齐下反而制造未对齐）
+        return (f + 15) // 16 * 16
 
     def disp(self, idx: int) -> int:
         """槽位相对 RSP 的偏移（只与序号有关，与帧大小无关）"""
@@ -106,6 +120,9 @@ class Frame:
 
 def emit_runtime(a: Asm, pe: PEBuilder) -> None:
     pe.declare_imports(IMPORTS)
+    pe.declare_imports(WS2_IMPORTS, "ws2_32.dll")
+    pe.declare_imports(USER32_IMPORTS, "user32.dll")
+    pe.declare_imports(GDI32_IMPORTS, "gdi32.dll")
 
     # ---------------- 全局数据 ----------------
     for g in ("g_stdout", "g_buf_len", "g_heap_ptr", "g_heap_end", "g_qhead", "g_qtail",
@@ -117,6 +134,17 @@ def emit_runtime(a: Asm, pe: PEBuilder) -> None:
     pe.data_item("g_sysinfo", b"\x00" * 48)                       # SYSTEM_INFO
     pe.data_item("g_threads", b"\x00" * (8 * MAX_WORKERS))        # 线程句柄数组
     pe.data_item("g_printbuf", b"\x00" * PRINTBUF_SIZE, align=16)
+    # ---- 系统原语所需数据 ----
+    pe.data_item("g_wsa", b"\x00" * 400)                          # WSADATA（实际 394 字节）
+    pe.data_item("g_sin", b"\x00" * 16)                           # sockaddr_in
+    pe.data_item("g_su", b"\x00" * 104)                           # STARTUPINFOA（x64 共 104 字节）
+    pe.data_item("g_pi", b"\x00" * 24)                            # PROCESS_INFORMATION
+    pe.rdata_item("str_loopback", b"127.0.0.1\x00", align=1)
+    pe.data_item("g_bmi", b"\x00" * 40)      # BITMAPINFOHEADER
+    pe.data_item("g_pt", b"\x00" * 8)        # POINT（GetCursorPos）
+    # SECURITY_ATTRIBUTES{ nLength=16, lpSecurityDescriptor=NULL, bInheritHandle=TRUE }
+    # x64 布局：nLength(4) + 4 填充 + lpSecurityDescriptor(8) + bInheritHandle(4) + 4 填充 = 24
+    pe.data_item("g_sa", struct.pack("<I4xQI4x", 16, 0, 1))
 
     pe.rdata_item("str_nl", b"\n")
     pe.rdata_item("str_empty", b"\x00")
@@ -893,4 +921,668 @@ def emit_runtime(a: Asm, pe: PEBuilder) -> None:
     f.close()
     a.label("rt_seq_yes")
     a.mov_ri(RAX, 1)
+    f.close()
+
+    # ================= 系统原语（EonOS 地基）：睡眠 / 墙钟 / TCP / 进程 =================
+    # 约定与既有原语一致：参数走 rcx/rdx/r8，返回值在 rax；失败一律返回 -1（Ptr 返回 0）。
+    # socket 句柄按 Int 传（SOCKET 是 UINT_PTR）；进程块是 16 字节 Ptr：
+    #   [0] = hProcess   [8] = hPipeRead（无管道 spawn 时为 0）
+
+    # ---------------- 睡眠 / 墙钟 ----------------
+    a.note("rt_sleep_ms / rt_wall_ms")
+    a.label("rt_sleep_ms")                  # rcx = 毫秒
+    f = Frame(a)
+    a.call_rip("imp_Sleep")
+    f.close()
+
+    a.label("rt_wall_ms")                   # -> rax = 系统启动以来的毫秒数
+    f = Frame(a)
+    a.call_rip("imp_GetTickCount64")
+    f.close()
+
+    # ---------------- Winsock 基础 ----------------
+    a.note("rt_net_init：WSAStartup(2.2)")
+    a.label("rt_net_init")
+    f = Frame(a)
+    a.mov_ri(RCX, 0x0202)                   # MAKEWORD(2, 2)
+    a.lea_rip(RDX, "g_wsa")
+    a.call_rip("imp_WSAStartup")
+    a.test_rr(RAX, RAX)
+    a.jcc("e", "rt_ni_ok")
+    a.mov_ri(RAX, -1)
+    a.jmp("rt_ni_done")
+    a.label("rt_ni_ok")
+    a.xor_rr(RAX, RAX)
+    a.label("rt_ni_done")
+    f.close()
+
+    a.note("rt_net_err：最近一次 Winsock 错误码")
+    a.label("rt_net_err")
+    f = Frame(a)
+    a.call_rip("imp_WSAGetLastError")
+    f.close()
+
+    # rt_net_sock() -> rax = TCP socket / -1（内部助手）
+    a.label("rt_net_sock")
+    f = Frame(a)
+    a.mov_ri(RCX, 2)                        # AF_INET
+    a.mov_ri(RDX, 1)                        # SOCK_STREAM
+    a.mov_ri(R8, 6)                         # IPPROTO_TCP
+    a.call_rip("imp_socket")
+    a.cmp_ri(RAX, -1)
+    a.jcc("ne", "rt_ns_ok")
+    a.mov_ri(RAX, -1)
+    a.label("rt_ns_ok")
+    f.close()
+
+    # rt_net_sin(rcx=端口(主机序), rdx=addr(u32, inet_addr 网络序))：填 16 字节 g_sin
+    a.label("rt_net_sin")
+    f = Frame(a)
+    sl_port = f.alloc()
+    sl_addr = f.alloc()
+    a.mov_mr(RSP, f.disp(sl_port), RCX)
+    a.mov_mr(RSP, f.disp(sl_addr), RDX)
+    a.call_rip("imp_htons")
+    a.and_ri(RAX, 0xFFFF)                   # u_short 返回，高位不保证干净
+    a.shl_ri(RAX, 16)
+    a.mov_ri(R9, 2)                         # AF_INET
+    a.or_rr(RAX, R9)                        # 低 4 字节 = family | port<<16
+    a.mov_rm(RDX, RSP, f.disp(sl_addr))
+    a.shl_ri(RDX, 32)
+    a.or_rr(RAX, RDX)                       # 高 4 字节 = inet_addr
+    a.lea_rip(RCX, "g_sin")
+    a.mov_mr(RCX, 0, RAX)
+    a.xor_rr(RDX, RDX)
+    a.mov_mr(RCX, 8, RDX)                   # sin_zero 清零
+    f.close()
+
+    # ---------------- TCP ----------------
+    a.note("rt_net_listen(port) -> 监听 socket / -1")
+    a.label("rt_net_listen")
+    f = Frame(a)
+    sl_s = f.alloc()
+    sl_port = f.alloc()
+    a.mov_mr(RSP, f.disp(sl_port), RCX)     # 先存端口（不能和 socket 共用槽！）
+    a.call("rt_net_sock")
+    a.cmp_ri(RAX, -1)
+    a.jcc("ne", "rt_nl_have")
+    a.mov_ri(RAX, -1)
+    f.close()
+    a.label("rt_nl_have")
+    a.mov_mr(RSP, f.disp(sl_s), RAX)        # socket 存自己的槽
+    a.mov_rm(RCX, RSP, f.disp(sl_port))     # 端口
+    a.xor_rr(RDX, RDX)                      # addr = INADDR_ANY
+    a.call("rt_net_sin")
+    a.mov_rm(RCX, RSP, f.disp(sl_s))
+    a.lea_rip(RDX, "g_sin")
+    a.mov_ri(R8, 16)
+    a.call_rip("imp_bind")
+    a.movsxd_rax_eax()
+    a.cmp_ri(RAX, -1)
+    a.jcc("ne", "rt_nl_bok")
+    a.mov_rm(RCX, RSP, f.disp(sl_s))
+    a.call_rip("imp_closesocket")
+    a.movsxd_rax_eax()
+    a.mov_ri(RAX, -1)
+    f.close()
+    a.label("rt_nl_bok")
+    a.mov_rm(RCX, RSP, f.disp(sl_s))
+    a.mov_ri(RDX, 16)                       # backlog
+    a.call_rip("imp_listen")
+    a.movsxd_rax_eax()
+    a.cmp_ri(RAX, -1)
+    a.jcc("ne", "rt_nl_lok")
+    a.mov_rm(RCX, RSP, f.disp(sl_s))
+    a.call_rip("imp_closesocket")
+    a.movsxd_rax_eax()
+    a.mov_ri(RAX, -1)
+    f.close()
+    a.label("rt_nl_lok")
+    a.mov_rm(RAX, RSP, f.disp(sl_s))
+    f.close()
+
+    a.note("rt_net_listen_loop(port) -> 监听 socket / -1（仅绑定 127.0.0.1）")
+    a.label("rt_net_listen_loop")
+    f = Frame(a)
+    sl_s = f.alloc()
+    sl_port = f.alloc()
+    a.mov_mr(RSP, f.disp(sl_port), RCX)     # 先存端口（不能和 socket 共用槽！）
+    a.call("rt_net_sock")
+    a.cmp_ri(RAX, -1)
+    a.jcc("ne", "rt_nll_have")
+    a.mov_ri(RAX, -1)
+    f.close()
+    a.label("rt_nll_have")
+    a.mov_mr(RSP, f.disp(sl_s), RAX)        # socket 存自己的槽
+    a.lea_rip(RCX, "str_loopback")
+    a.call_rip("imp_inet_addr")             # rax = 127.0.0.1（网络序 u32）
+    a.mov_rr(RDX, RAX)
+    a.mov_rm(RCX, RSP, f.disp(sl_port))
+    a.call("rt_net_sin")
+    a.mov_rm(RCX, RSP, f.disp(sl_s))
+    a.lea_rip(RDX, "g_sin")
+    a.mov_ri(R8, 16)
+    a.call_rip("imp_bind")
+    a.movsxd_rax_eax()
+    a.cmp_ri(RAX, -1)
+    a.jcc("ne", "rt_nll_bok")
+    a.mov_rm(RCX, RSP, f.disp(sl_s))
+    a.call_rip("imp_closesocket")
+    a.movsxd_rax_eax()
+    a.mov_ri(RAX, -1)
+    f.close()
+    a.label("rt_nll_bok")
+    a.mov_rm(RCX, RSP, f.disp(sl_s))
+    a.mov_ri(RDX, 16)                       # backlog
+    a.call_rip("imp_listen")
+    a.movsxd_rax_eax()
+    a.cmp_ri(RAX, -1)
+    a.jcc("ne", "rt_nll_lok")
+    a.mov_rm(RCX, RSP, f.disp(sl_s))
+    a.call_rip("imp_closesocket")
+    a.movsxd_rax_eax()
+    a.mov_ri(RAX, -1)
+    f.close()
+    a.label("rt_nll_lok")
+    a.mov_rm(RAX, RSP, f.disp(sl_s))
+    f.close()
+
+    a.note("rt_net_accept(lsock) -> 客户端 socket / -1")
+    a.label("rt_net_accept")
+    f = Frame(a)
+    a.xor_rr(RDX, RDX)                      # 不取对端地址
+    a.xor_rr(R8, R8)
+    a.call_rip("imp_accept")
+    f.close()
+
+    a.note("rt_net_connect(host, port) -> socket / -1")
+    a.label("rt_net_connect")
+    f = Frame(a)
+    sl_s = f.alloc()
+    sl_h = f.alloc()
+    sl_p = f.alloc()
+    sl_a = f.alloc()
+    a.mov_mr(RSP, f.disp(sl_h), RCX)
+    a.mov_mr(RSP, f.disp(sl_p), RDX)
+    a.call("rt_net_sock")
+    a.cmp_ri(RAX, -1)
+    a.jcc("ne", "rt_nc_have")
+    a.mov_ri(RAX, -1)
+    f.close()
+    a.label("rt_nc_have")
+    a.mov_mr(RSP, f.disp(sl_s), RAX)
+    a.mov_rm(RCX, RSP, f.disp(sl_h))
+    a.call_rip("imp_inet_addr")
+    a.mov_mr(RSP, f.disp(sl_a), RAX)
+    a.mov_rm(RCX, RSP, f.disp(sl_p))
+    a.mov_rm(RDX, RSP, f.disp(sl_a))        # addr
+    a.call("rt_net_sin")
+    a.mov_rm(RCX, RSP, f.disp(sl_s))
+    a.lea_rip(RDX, "g_sin")
+    a.mov_ri(R8, 16)
+    a.call_rip("imp_connect")
+    a.movsxd_rax_eax()
+    a.cmp_ri(RAX, -1)
+    a.jcc("ne", "rt_nc_ok")
+    a.mov_rm(RCX, RSP, f.disp(sl_s))
+    a.call_rip("imp_closesocket")
+    a.movsxd_rax_eax()
+    a.mov_ri(RAX, -1)
+    f.close()
+    a.label("rt_nc_ok")
+    a.mov_rm(RAX, RSP, f.disp(sl_s))
+    f.close()
+
+    a.note("rt_net_send(sock, buf, len) -> 发送字节数 / -1")
+    a.label("rt_net_send")
+    f = Frame(a)
+    a.xor_rr(R9, R9)                        # flags = 0
+    a.call_rip("imp_send")
+    a.movsxd_rax_eax()
+    f.close()
+
+    a.note("rt_net_recv(sock, buf, maxlen) -> 收到字节数（0=对端关闭）/ -1")
+    a.label("rt_net_recv")
+    f = Frame(a)
+    a.xor_rr(R9, R9)
+    a.call_rip("imp_recv")
+    a.movsxd_rax_eax()
+    f.close()
+
+    a.note("rt_net_close(sock) -> 0 / -1")
+    a.label("rt_net_close")
+    f = Frame(a)
+    a.call_rip("imp_closesocket")
+    a.movsxd_rax_eax()
+    f.close()
+
+    # ---------------- 进程 ----------------
+    # rt_proc_spawn(rcx=命令行, rdx=capture) -> 16 字节块指针 / 0
+    #   capture=0：子进程继承控制台；capture=1：子进程 stdout+stderr 接入管道
+    a.note("rt_proc_spawn")
+    a.label("rt_proc_spawn")
+    f = Frame(a, nextra=6, saved=(RDI,))    # CreateProcessA 有 10 个参数
+    sl_cmd = f.alloc()
+    sl_cap = f.alloc()
+    sl_rd = f.alloc()
+    sl_wr = f.alloc()
+    sl_p = f.alloc()
+    sl_n = f.alloc()
+    a.mov_mr(RSP, f.disp(sl_cap), RDX)
+    a.mov_mr(RSP, f.disp(sl_cmd), RCX)
+    # 命令行拷到可写缓冲（CreateProcessA 允许改写 lpCommandLine，.rdata 不可写）
+    a.call("rt_str_len")
+    a.add_ri(RAX, 1)
+    a.mov_mr(RSP, f.disp(sl_n), RAX)
+    a.mov_rr(RCX, RAX)
+    a.call("rt_alloc")
+    a.mov_mr(RSP, f.disp(sl_p), RAX)
+    a.mov_rm(RCX, RSP, f.disp(sl_p))        # dst
+    a.mov_rm(RDX, RSP, f.disp(sl_cmd))      # src
+    a.mov_rm(R8, RSP, f.disp(sl_n))
+    a.call("rt_copy")
+    # 管道（capture 时）
+    a.mov_rm(RCX, RSP, f.disp(sl_cap))
+    a.test_rr(RCX, RCX)
+    a.jcc("e", "rt_ps_nopipe")
+    a.lea_mem(RCX, RSP, f.disp(sl_rd))
+    a.lea_mem(RDX, RSP, f.disp(sl_wr))
+    a.lea_rip(R8, "g_sa")
+    a.xor_rr(R9, R9)
+    a.call_rip("imp_CreatePipe")
+    a.cmp_ri(RAX, 0)
+    a.jcc("ne", "rt_ps_pipeok")
+    a.xor_rr(RAX, RAX)                      # CreatePipe 失败
+    f.close()
+    a.label("rt_ps_pipeok")
+    a.mov_rm(RCX, RSP, f.disp(sl_rd))
+    a.mov_ri(RDX, 1)                        # HANDLE_FLAG_INHERIT
+    a.xor_rr(R8, R8)                        # 清除继承（读端归父进程）
+    a.call_rip("imp_SetHandleInformation")
+    a.label("rt_ps_nopipe")
+    # STARTUPINFOA 清零并填字段
+    a.lea_rip(RCX, "g_su")
+    a.mov_ri(RDX, 104)
+    a.call("rt_zero")
+    a.lea_rip(RAX, "g_su")
+    a.mov_mi(RAX, 0, 104)                   # cb
+    a.mov_rm(RCX, RSP, f.disp(sl_cap))
+    a.test_rr(RCX, RCX)
+    a.jcc("e", "rt_ps_nostd")
+    a.mov_mi(RAX, 60, 0x100)                # dwFlags = STARTF_USESTDHANDLES
+    a.mov_rm(RCX, RSP, f.disp(sl_wr))
+    a.mov_mr(RAX, 88, RCX)                  # hStdOutput = 管道写端
+    a.mov_mr(RAX, 96, RCX)                  # hStdError  = 管道写端
+    a.label("rt_ps_nostd")
+    a.lea_rip(RCX, "g_pi")
+    a.mov_ri(RDX, 24)
+    a.call("rt_zero")
+    # CreateProcessA(NULL, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &g_su, &g_pi)
+    a.mov_mi(RSP, f.extra_disp(0), 1)       # bInheritHandles = TRUE
+    a.mov_mi(RSP, f.extra_disp(1), 0)       # dwCreationFlags
+    a.mov_mi(RSP, f.extra_disp(2), 0)       # lpEnvironment
+    a.mov_mi(RSP, f.extra_disp(3), 0)       # lpCurrentDirectory
+    a.lea_rip(RAX, "g_su")
+    a.mov_mr(RSP, f.extra_disp(4), RAX)
+    a.lea_rip(RAX, "g_pi")
+    a.mov_mr(RSP, f.extra_disp(5), RAX)
+    a.xor_rr(RCX, RCX)
+    a.mov_rm(RDX, RSP, f.disp(sl_p))
+    a.xor_rr(R8, R8)
+    a.xor_rr(R9, R9)
+    a.call_rip("imp_CreateProcessA")
+    a.cmp_ri(RAX, 0)
+    a.jcc("ne", "rt_ps_ok")
+    a.mov_rm(RCX, RSP, f.disp(sl_cap))      # 失败清理
+    a.test_rr(RCX, RCX)
+    a.jcc("e", "rt_ps_fail_nopipe")
+    a.mov_rm(RCX, RSP, f.disp(sl_rd))
+    a.call_rip("imp_CloseHandle")
+    a.mov_rm(RCX, RSP, f.disp(sl_wr))
+    a.call_rip("imp_CloseHandle")
+    a.label("rt_ps_fail_nopipe")
+    a.xor_rr(RAX, RAX)
+    f.close()
+    a.label("rt_ps_ok")
+    a.mov_rm(RCX, RSP, f.disp(sl_cap))      # 父进程必须关掉管道写端，否则收不到 EOF
+    a.test_rr(RCX, RCX)
+    a.jcc("e", "rt_ps_nowr")
+    a.mov_rm(RCX, RSP, f.disp(sl_wr))
+    a.call_rip("imp_CloseHandle")
+    a.label("rt_ps_nowr")
+    a.lea_rip(RAX, "g_pi")
+    a.mov_rm(RCX, RAX, 8)                   # hThread 不用，直接关
+    a.call_rip("imp_CloseHandle")
+    # 结果块：[0]=hProcess, [8]=hPipeRead 或 0
+    a.mov_ri(RCX, 16)
+    a.call("rt_alloc")
+    a.mov_rr(RDI, RAX)
+    a.lea_rip(RCX, "g_pi")
+    a.mov_rm(R8, RCX, 0)                    # hProcess
+    a.mov_mr(RDI, 0, R8)
+    a.mov_rm(RCX, RSP, f.disp(sl_cap))
+    a.test_rr(RCX, RCX)
+    a.jcc("e", "rt_ps_nord")
+    a.mov_rm(RCX, RSP, f.disp(sl_rd))
+    a.jmp("rt_ps_stord")
+    a.label("rt_ps_nord")
+    a.xor_rr(RCX, RCX)
+    a.label("rt_ps_stord")
+    a.mov_mr(RDI, 8, RCX)
+    a.mov_rr(RAX, RDI)
+    f.close()
+
+    a.note("rt_proc_spawn_n(cmd)：无管道版（rt_proc_spawn 的 rdx=0 包装）")
+    a.label("rt_proc_spawn_n")
+    a.xor_rr(RDX, RDX)
+    a.jmp("rt_proc_spawn")
+
+    # rt_proc_read(p, buf, max) -> 读到字节数（0=EOF）/ -1
+    a.note("rt_proc_read")
+    a.label("rt_proc_read")
+    f = Frame(a, nextra=1)                  # ReadFile 有 5 个参数
+    sl_p = f.alloc()
+    sl_buf = f.alloc()
+    sl_max = f.alloc()
+    a.mov_mr(RSP, f.disp(sl_p), RCX)
+    a.mov_mr(RSP, f.disp(sl_buf), RDX)
+    a.mov_mr(RSP, f.disp(sl_max), R8)
+    a.mov_rm(RCX, RSP, f.disp(sl_p))
+    a.mov_rm(RCX, RCX, 8)                   # hPipeRead
+    a.test_rr(RCX, RCX)
+    a.jcc("ne", "rt_pr_have")
+    a.mov_ri(RAX, -1)
+    f.close()
+    a.label("rt_pr_have")
+    a.xor_rr(RAX, RAX)
+    a.mov_rip_r("g_iobytes", RAX)           # 先清零：失败时返回 0 = EOF 语义
+    a.mov_rm(RDX, RSP, f.disp(sl_buf))
+    a.mov_rm(R8, RSP, f.disp(sl_max))
+    a.lea_rip(R9, "g_iobytes")
+    a.mov_mi(RSP, f.extra_disp(0), 0)       # lpOverlapped = NULL（同一句柄必须显式给）
+    a.call_rip("imp_ReadFile")
+    a.mov_r_rip(RAX, "g_iobytes")           # 管道对端关闭时 ReadFile 返回 FALSE + ERROR_BROKEN_PIPE，
+    f.close()                               # 此处按 EOF（0）返回，便于 Whisker 侧收尾
+
+    # rt_proc_wait(p) -> 退出码 / -1
+    a.note("rt_proc_wait")
+    a.label("rt_proc_wait")
+    f = Frame(a)
+    sl_h = f.alloc()
+    a.mov_rm(RCX, RCX, 0)                   # hProcess
+    a.mov_mr(RSP, f.disp(sl_h), RCX)
+    a.mov_ri(RDX, -1)                       # INFINITE
+    a.call_rip("imp_WaitForSingleObject")
+    a.mov_rm(RCX, RSP, f.disp(sl_h))
+    a.lea_rip(RDX, "g_iobytes")
+    a.call_rip("imp_GetExitCodeProcess")
+    a.cmp_ri(RAX, 0)
+    a.jcc("ne", "rt_pw_ok")
+    a.mov_ri(RAX, -1)
+    f.close()
+    a.label("rt_pw_ok")
+    a.mov_r_rip(RAX, "g_iobytes")
+    f.close()
+
+    # rt_proc_free(p)：关句柄（bump 分配器不回收块本身）
+    a.note("rt_proc_free")
+    a.label("rt_proc_free")
+    f = Frame(a)
+    sl_p = f.alloc()
+    a.mov_mr(RSP, f.disp(sl_p), RCX)
+    a.mov_rm(RCX, RCX, 0)
+    a.test_rr(RCX, RCX)
+    a.jcc("e", "rt_pf_nop")
+    a.call_rip("imp_CloseHandle")
+    a.label("rt_pf_nop")
+    a.mov_rm(RCX, RSP, f.disp(sl_p))
+    a.mov_rm(RCX, RCX, 8)
+    a.test_rr(RCX, RCX)
+    a.jcc("e", "rt_pf_nor")
+    a.call_rip("imp_CloseHandle")
+    a.label("rt_pf_nor")
+    a.xor_rr(RAX, RAX)
+    f.close()
+
+    # ================= agent 原语（EonOS）：屏幕 / 鼠标 / 键盘 =================
+    a.note("rt_screen_w / rt_screen_h（GetSystemMetrics）")
+    a.label("rt_screen_w")
+    f = Frame(a)
+    a.xor_rr(RCX, RCX)                      # SM_CXSCREEN
+    a.call_rip("imp_GetSystemMetrics")
+    a.movsxd_rax_eax()
+    f.close()
+
+    a.label("rt_screen_h")
+    f = Frame(a)
+    a.mov_ri(RCX, 1)                        # SM_CYSCREEN
+    a.call_rip("imp_GetSystemMetrics")
+    a.movsxd_rax_eax()
+    f.close()
+
+    a.note("rt_mouse_x / rt_mouse_y（GetCursorPos -> g_pt）")
+    a.label("rt_mouse_x")
+    f = Frame(a)
+    a.lea_rip(RCX, "g_pt")
+    a.call_rip("imp_GetCursorPos")
+    a.cmp_ri(RAX, 0)
+    a.jcc("ne", "rt_mx_ok")
+    a.mov_ri(RAX, -1)
+    f.close()
+    a.label("rt_mx_ok")
+    a.mov_r_rip(RAX, "g_pt")
+    a.movsxd_rax_eax()                      # 取低 32 位（POINT.x）
+    f.close()
+
+    a.label("rt_mouse_y")
+    f = Frame(a)
+    a.lea_rip(RCX, "g_pt")
+    a.call_rip("imp_GetCursorPos")
+    a.cmp_ri(RAX, 0)
+    a.jcc("ne", "rt_my_ok")
+    a.mov_ri(RAX, -1)
+    f.close()
+    a.label("rt_my_ok")
+    a.mov_r_rip(RAX, "g_pt")
+    a.emit(0x48, 0xC1, 0xE8, 0x20)          # shr rax, 32（POINT.y）
+    f.close()
+
+    a.note("rt_mouse_move(x, y)（SetCursorPos）")
+    a.label("rt_mouse_move")
+    f = Frame(a)
+    a.call_rip("imp_SetCursorPos")
+    a.movsxd_rax_eax()
+    f.close()
+
+    # rt_mouse_down(button 1/2/3)：左 0x02 / 右 0x08 / 中 0x20
+    a.note("rt_mouse_down / rt_mouse_up")
+    a.label("rt_mouse_down")
+    f = Frame(a, nextra=1)
+    sl_f = f.alloc()
+    a.mov_ri(RDX, 2)
+    a.mov_mr(RSP, f.disp(sl_f), RDX)
+    a.cmp_ri(RCX, 2)
+    a.jcc("ne", "rt_md_c2")
+    a.mov_ri(RDX, 8)
+    a.mov_mr(RSP, f.disp(sl_f), RDX)
+    a.label("rt_md_c2")
+    a.cmp_ri(RCX, 3)
+    a.jcc("ne", "rt_md_go")
+    a.mov_ri(RDX, 32)
+    a.mov_mr(RSP, f.disp(sl_f), RDX)
+    a.label("rt_md_go")
+    a.mov_rm(RCX, RSP, f.disp(sl_f))
+    a.xor_rr(RDX, RDX)
+    a.xor_rr(R8, R8)
+    a.xor_rr(R9, R9)
+    a.mov_mi(RSP, f.extra_disp(0), 0)
+    a.call_rip("imp_mouse_event")
+    a.xor_rr(RAX, RAX)
+    f.close()
+
+    a.label("rt_mouse_up")
+    f = Frame(a, nextra=1)
+    sl_f2 = f.alloc()
+    a.mov_ri(RDX, 2)
+    a.mov_mr(RSP, f.disp(sl_f2), RDX)
+    a.cmp_ri(RCX, 2)
+    a.jcc("ne", "rt_mu_c2")
+    a.mov_ri(RDX, 8)
+    a.mov_mr(RSP, f.disp(sl_f2), RDX)
+    a.label("rt_mu_c2")
+    a.cmp_ri(RCX, 3)
+    a.jcc("ne", "rt_mu_go")
+    a.mov_ri(RDX, 32)
+    a.mov_mr(RSP, f.disp(sl_f2), RDX)
+    a.label("rt_mu_go")
+    a.mov_rm(RCX, RSP, f.disp(sl_f2))
+    a.shl_ri(RCX, 1)                        # 抬起 = 按下标志 << 1
+    a.xor_rr(RDX, RDX)
+    a.xor_rr(R8, R8)
+    a.xor_rr(R9, R9)
+    a.mov_mi(RSP, f.extra_disp(0), 0)
+    a.call_rip("imp_mouse_event")
+    a.xor_rr(RAX, RAX)
+    f.close()
+
+    a.note("rt_key_down / rt_key_up（keybd_event）")
+    a.label("rt_key_down")
+    f = Frame(a)
+    a.xor_rr(RDX, RDX)
+    a.xor_rr(R8, R8)
+    a.xor_rr(R9, R9)
+    a.call_rip("imp_keybd_event")
+    a.xor_rr(RAX, RAX)
+    f.close()
+
+    a.label("rt_key_up")
+    f = Frame(a)
+    a.xor_rr(RDX, RDX)
+    a.mov_ri(R8, 2)                         # KEYEVENTF_KEYUP
+    a.xor_rr(R9, R9)
+    a.call_rip("imp_keybd_event")
+    a.xor_rr(RAX, RAX)
+    f.close()
+
+    a.note("rt_key_vk(ch)（VkKeyScanA：低字节 VK，高字节 shift 状态）")
+    a.label("rt_key_vk")
+    f = Frame(a)
+    a.call_rip("imp_VkKeyScanA")
+    a.and_ri(RAX, 0xFFFF)
+    f.close()
+
+    # rt_screenshot(path) -> 写出 BMP 的字节数 / -1
+    a.note("rt_screenshot（GetDC/BitBlt/GetDIBits -> BMP 文件）")
+    a.label("rt_screenshot")
+    f = Frame(a, nextra=5, saved=(RDI,))
+    sl_path = f.alloc()
+    sl_w = f.alloc()
+    sl_h = f.alloc()
+    sl_hdc = f.alloc()
+    sl_mem = f.alloc()
+    sl_bmp = f.alloc()
+    sl_old = f.alloc()
+    sl_pix = f.alloc()
+    sl_size = f.alloc()
+    a.mov_mr(RSP, f.disp(sl_path), RCX)
+    a.xor_rr(RCX, RCX)
+    a.call_rip("imp_GetSystemMetrics")
+    a.movsxd_rax_eax()
+    a.mov_mr(RSP, f.disp(sl_w), RAX)
+    a.mov_ri(RCX, 1)
+    a.call_rip("imp_GetSystemMetrics")
+    a.movsxd_rax_eax()
+    a.mov_mr(RSP, f.disp(sl_h), RAX)
+    a.xor_rr(RCX, RCX)
+    a.call_rip("imp_GetDC")
+    a.mov_mr(RSP, f.disp(sl_hdc), RAX)
+    a.mov_rr(RCX, RAX)
+    a.call_rip("imp_CreateCompatibleDC")
+    a.mov_mr(RSP, f.disp(sl_mem), RAX)
+    a.mov_rm(RCX, RSP, f.disp(sl_hdc))
+    a.mov_rm(RDX, RSP, f.disp(sl_w))
+    a.mov_rm(R8, RSP, f.disp(sl_h))
+    a.call_rip("imp_CreateCompatibleBitmap")
+    a.mov_mr(RSP, f.disp(sl_bmp), RAX)
+    a.mov_rm(RCX, RSP, f.disp(sl_mem))
+    a.mov_rm(RDX, RSP, f.disp(sl_bmp))
+    a.call_rip("imp_SelectObject")
+    a.mov_mr(RSP, f.disp(sl_old), RAX)
+    # BitBlt(mem,0,0,w,h,hdc,0,0,SRCCOPY) 9 参（5 栈传）
+    a.mov_rm(RCX, RSP, f.disp(sl_mem))
+    a.xor_rr(RDX, RDX)
+    a.xor_rr(R8, R8)
+    a.mov_rm(R9, RSP, f.disp(sl_w))
+    a.mov_rm(RAX, RSP, f.disp(sl_h))
+    a.mov_mr(RSP, f.extra_disp(0), RAX)
+    a.mov_rm(RAX, RSP, f.disp(sl_hdc))
+    a.mov_mr(RSP, f.extra_disp(1), RAX)
+    a.mov_mi(RSP, f.extra_disp(2), 0)
+    a.mov_mi(RSP, f.extra_disp(3), 0)
+    a.mov_mi(RSP, f.extra_disp(4), 0xCC0020)
+    a.call_rip("imp_BitBlt")
+    # g_bmi：40 字节头（w/h/planes=1/bpp=32）
+    a.lea_rip(RCX, "g_bmi")
+    a.mov_ri(RDX, 40)
+    a.call("rt_zero")
+    a.lea_rip(RAX, "g_bmi")
+    a.mov_mi(RAX, 0, 40)
+    a.mov_rm(RCX, RSP, f.disp(sl_w))
+    a.mov_mr(RAX, 4, RCX)
+    a.mov_rm(RCX, RSP, f.disp(sl_h))
+    a.mov_mr(RAX, 8, RCX)
+    a.mov_mi(RAX, 12, 1)
+    a.mov_mi(RAX, 14, 32)
+    # 缓冲 54 + w*h*4
+    a.mov_rm(RCX, RSP, f.disp(sl_w))
+    a.mov_rm(RDX, RSP, f.disp(sl_h))
+    a.imul_rr(RCX, RDX)
+    a.mov_ri(RDX, 4)
+    a.imul_rr(RCX, RDX)
+    a.add_ri(RCX, 54)
+    a.mov_mr(RSP, f.disp(sl_size), RCX)
+    a.call("rt_alloc")
+    a.mov_mr(RSP, f.disp(sl_pix), RAX)
+    # GetDIBits(mem,bmp,0,h,pix+54,g_bmi,0) 7 参（3 栈传）
+    a.mov_rm(RCX, RSP, f.disp(sl_mem))
+    a.mov_rm(RDX, RSP, f.disp(sl_bmp))
+    a.xor_rr(R8, R8)
+    a.mov_rm(R9, RSP, f.disp(sl_h))
+    a.mov_rm(RAX, RSP, f.disp(sl_pix))
+    a.add_ri(RAX, 54)
+    a.mov_mr(RSP, f.extra_disp(0), RAX)
+    a.lea_rip(RAX, "g_bmi")
+    a.mov_mr(RSP, f.extra_disp(1), RAX)
+    a.mov_mi(RSP, f.extra_disp(2), 0)
+    a.call_rip("imp_GetDIBits")
+    # 释放 GDI
+    a.mov_rm(RCX, RSP, f.disp(sl_mem))
+    a.mov_rm(RDX, RSP, f.disp(sl_old))
+    a.call_rip("imp_SelectObject")
+    a.mov_rm(RCX, RSP, f.disp(sl_bmp))
+    a.call_rip("imp_DeleteObject")
+    a.mov_rm(RCX, RSP, f.disp(sl_mem))
+    a.call_rip("imp_DeleteDC")
+    a.xor_rr(RCX, RCX)
+    a.mov_rm(RDX, RSP, f.disp(sl_hdc))
+    a.call_rip("imp_ReleaseDC")
+    # BMP 头（54 字节）
+    a.mov_rm(RAX, RSP, f.disp(sl_pix))
+    a.mov_mi(RAX, 0, 0x4D42)
+    a.mov_rm(RCX, RSP, f.disp(sl_size))
+    a.mov_mr(RAX, 2, RCX)
+    a.mov_mi(RAX, 6, 0)
+    a.mov_mi(RAX, 10, 54)
+    a.mov_mi(RAX, 14, 40)
+    a.mov_rm(RCX, RSP, f.disp(sl_w))
+    a.mov_mr(RAX, 18, RCX)
+    a.mov_rm(RCX, RSP, f.disp(sl_h))
+    a.mov_mr(RAX, 22, RCX)
+    a.mov_mi(RAX, 26, 1)
+    a.mov_mi(RAX, 28, 32)
+    # 写盘
+    a.mov_rm(RCX, RSP, f.disp(sl_path))
+    a.mov_rm(RDX, RSP, f.disp(sl_pix))
+    a.mov_rm(R8, RSP, f.disp(sl_size))
+    a.call("rt_write_file")
     f.close()

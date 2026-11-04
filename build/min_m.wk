@@ -1,0 +1,9 @@
+actor Main {
+    limit: Int = 0
+    def f[] -> Int {
+        return 1
+    }
+    on Start {
+        print(1)
+    }
+}

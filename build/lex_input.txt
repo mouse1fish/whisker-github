@@ -1,0 +1,6 @@
+// 最小示例：入口 actor 必须叫 Main，且实现 on Start
+actor Main {
+    on Start {
+        print("你好，Whisker！")
+    }
+}

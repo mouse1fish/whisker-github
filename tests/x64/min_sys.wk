@@ -1,0 +1,20 @@
+# min_sys.wk —— 系统原语冒烟测试：墙钟 + 睡眠
+# 期望输出：wall>0、睡眠约 50ms
+actor Main {
+    on Start {
+        t0: Int = wallMs()
+        if t0 > 0 {
+            print("wallMs 正常")
+        } else {
+            print("wallMs 异常")
+        }
+        sleepMs(50)
+        t1: Int = wallMs()
+        d: Int = t1 - t0
+        if d >= 45 {
+            print("sleepMs 正常: ", d, "ms")
+        } else {
+            print("sleepMs 异常: ", d, "ms")
+        }
+    }
+}

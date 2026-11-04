@@ -1,0 +1,20 @@
+# proc_dbg3.wk —— 打印进程块内容
+actor Main {
+    on Start {
+        p: Ptr = procSpawnPipe("cmd.exe /c echo HI")
+        if isNull(p) {
+            print("spawn 失败")
+        } else {
+            print("hProcess=", load64(p))
+            print("hPipeRead=", load64(ptrAdd(p, 8)))
+            buf: Ptr = alloc(64)
+            n: Int = procRead(p, buf, 63)
+            print("首次 read=", n)
+        }
+        q: Ptr = procSpawn("cmd.exe /c exit 7")
+        print("非管道 hProcess=", load64(q))
+        c: Int = procWait(q)
+        print("非管道退出码=", c)
+        print("完成")
+    }
+}

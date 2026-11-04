@@ -1,0 +1,6 @@
+
+actor Main {
+    n: Int = 0
+    on Start { self.send(Bump(1)); }
+    on Bump[step: Int] { n = n + step; print("n=", n); }
+}

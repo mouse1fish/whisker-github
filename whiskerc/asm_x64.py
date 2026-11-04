@@ -302,6 +302,15 @@ class Asm:
     def movzx_eax_al(self) -> None:
         self.emit(0x0F, 0xB6, 0xC0)
 
+    def align_rsp(self) -> None:
+        """and rsp, -16（48 83 E4 F0）——帧内动态栈对齐，容忍未对齐的调用入口"""
+        self.emit(0x48, 0x83, 0xE4, 0xF0)
+
+    def movsxd_rax_eax(self) -> None:
+        """movsxd rax, eax（48 63 C0）——Windows x64 的 32 位返回值可能被零扩展，
+        返回 -1 的整型 API 必须符号扩展后再比较/使用。"""
+        self.emit(0x48, 0x63, 0xC0)
+
     def movzx_r_from_mem8(self, reg: int, base: int, disp: int = 0) -> None:
         rex, tail = self._mem_parts(reg, base, disp)
         self.emit(rex, 0x0F, 0xB6, tail)

@@ -1,0 +1,16 @@
+  125 (0x0207D): 48 8B 85       -> mov rax, [rbp-16]
+  132 (0x02084): 48 83 C0       -> add rax, 1
+  136 (0x02088): 48 89 85 f0 ff ff ff e9  ??
+  137 (0x02089): 89 85 f0 ff ff ff e9 a5  ??
+  138 (0x0208A): 85 f0 ff ff ff e9 a5 ff  ??
+  139 (0x0208B): f0 ff ff ff e9 a5 ff ff  ??
+  140 (0x0208C): ff ff ff e9 a5 ff ff ff  ??
+  141 (0x0208D): ff ff e9 a5 ff ff ff e8  ??
+  142 (0x0208E): ff e9 a5 ff ff ff e8 de  ??
+  143 (0x0208F): E9       -91  -> jmp 0x2039
+  148 (0x02094): E8     -2850  -> call RT 0x1577
+  153 (0x02099): 48 8B 85       -> mov rax, [rbp-8]
+  160 (0x020A0): 48 89 C1       -> mov rcx, rax
+  163 (0x020A3): E8     -2695  -> call RT 0x1621
+  168 (0x020A8): E8     -2462  -> call RT 0x170F
+  173 (0x020AD): 48 8B 85       -> mov rax, [rbp-8]
