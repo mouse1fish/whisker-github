@@ -1,0 +1,2 @@
+[wkcc] 编译 build\win_smoke.wk -> build\win_smoke.exe
+build\win_smoke.exe 写出 = 34304 字节

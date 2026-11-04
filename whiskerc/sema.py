@@ -51,6 +51,14 @@ BUILTIN_SIGS: dict[str, tuple[list[Ty], Ty]] = {
     "procWait": ([PTR_TY], INT_TY),                     # 等待退出 -> 退出码/-1
     "procFree": ([PTR_TY], VOID_TY),                    # 关闭进程块里的句柄
     "cmdline": ([], STR_TY),                            # 完整命令行（ANSI 字符串）
+    # ---- 3D 引擎（窗口 + 定点三角）----
+    "sin16": ([INT_TY], INT_TY),                        # 定点正弦（16.16，256 步整圆）
+    "cos16": ([INT_TY], INT_TY),                        # 定点余弦
+    "winOpen": ([STR_TY, INT_TY, INT_TY], INT_TY),      # 开窗（标题, 宽, 高）-> 1/0
+    "winPresent": ([PTR_TY, INT_TY, INT_TY], INT_TY),   # 推帧（BGRA 缓冲, 宽, 高）
+    "winPump": ([], INT_TY),                            # 泵消息 -> 1 存活 / 0 退出
+    "winClose": ([], INT_TY),                           # 关窗
+    "keyAsync": ([INT_TY], INT_TY),                     # 异步按键状态（非 0 = 按下）
     # ---- agent 原语（EonOS：屏幕/鼠标/键盘）----
     "screenW": ([], INT_TY),                            # 屏幕宽
     "screenH": ([], INT_TY),                            # 屏幕高

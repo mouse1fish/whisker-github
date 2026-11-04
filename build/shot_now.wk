@@ -1,0 +1,6 @@
+actor Main {
+    on Start {
+        n: Int = screenshot("build/live3d.bmp")
+        print("截图 ", n, " 字节")
+    }
+}

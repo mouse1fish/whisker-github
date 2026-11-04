@@ -849,7 +849,9 @@ class Fn:
                           "procRead", "procWait", "procFree",
                           "ptrToInt", "intToPtr",
                           "mouseMove", "mouseDown", "mouseUp",
-                          "keyDown", "keyUp", "keyVk", "screenshot"):
+                          "keyDown", "keyUp", "keyVk", "screenshot",
+                          "sin16", "cos16", "keyAsync",
+                          "winOpen", "winPresent", "winClose"):
                 self.builtin_call(e)
                 return
             if e.name == "nowMs":
@@ -866,6 +868,9 @@ class Fn:
                 return
             if e.name == "cmdline":
                 a.call("rt_cmdline")
+                return
+            if e.name == "winPump":
+                a.call("rt_win_pump")
                 return
             if e.name == "screenW":
                 a.call("rt_screen_w")
@@ -1067,6 +1072,42 @@ class Fn:
             self.eval(e.args[0])
             a.mov_rr(RCX, RAX)
             a.call("rt_net_close")
+            return
+
+        if name == "winOpen":                    # (标题, 宽, 高)
+            t0 = self.eval_to_temp(e.args[0])
+            t1 = self.eval_to_temp(e.args[1])
+            t2 = self.eval_to_temp(e.args[2])
+            a.mov_rm(RCX, RSP, self.f.disp(t0))
+            a.mov_rm(RDX, RSP, self.f.disp(t1))
+            a.mov_rm(R8, RSP, self.f.disp(t2))
+            a.call("rt_win_open")
+            return
+
+        if name == "winPresent":                 # (缓冲, 宽, 高)
+            t0 = self.eval_to_temp(e.args[0])
+            t1 = self.eval_to_temp(e.args[1])
+            t2 = self.eval_to_temp(e.args[2])
+            a.mov_rm(RCX, RSP, self.f.disp(t0))
+            a.mov_rm(RDX, RSP, self.f.disp(t1))
+            a.mov_rm(R8, RSP, self.f.disp(t2))
+            a.call("rt_win_present")
+            return
+
+        if name == "winClose":
+            a.call("rt_win_close")
+            return
+
+        if name == "sin16" or name == "cos16":
+            self.eval(e.args[0])
+            a.mov_rr(RCX, RAX)
+            a.call("rt_sin16" if name == "sin16" else "rt_cos16")
+            return
+
+        if name == "keyAsync":
+            self.eval(e.args[0])
+            a.mov_rr(RCX, RAX)
+            a.call("rt_key_async")
             return
 
         if name == "mouseMove":                  # (x, y)

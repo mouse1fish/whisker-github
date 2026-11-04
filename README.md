@@ -6,13 +6,14 @@
 **不用 C、不用 C++、不用 LLVM、不用链接器、零 libc** —— 语言运行时也是用我自己生成的机器码写的。
 
 已内置系统原语（TCP socket / 进程启动 / 时钟）与动态字符串标准库，实战项目见
-[EonOS 原生前门](../eonos/native/)（纯 Whisker 的 HTTP 服务器 + 命令执行器 + AI 反向代理）。
+[EonOS 系统](https://github.com/mouse1fish/eonos)（纯 Whisker 的 HTTP 网关 + 命令执行器 + agent 原语 + vLLM 直连）。
 
 - 📄 设计思路与规划：见 [`Whisker语言设计草案.md`](./Whisker语言设计草案.md)
 - 📜 **设计原则（宪法）**：四条原则 + 不做的事清单，见 [`交接文档-自举完成.md`](./交接文档-自举完成.md) 第 11 节
 - 🗓️ 当前进度、踩坑记录与断点：见 [`进度.md`](./进度.md)
 - 📚 **语言教程**（安装→入门→语法→内置函数→排障）：见 [`教程.md`](./教程.md)
 - 📦 **便携 SDK**（解压任意目录即用）：见 [`sdk/whisker-sdk/`](./sdk/whisker-sdk/)，分发 zip 为 [`sdk/whisker-sdk-2026-11-03.zip`](./sdk/whisker-sdk-2026-11-03.zip)
+- 🎮 **3D 引擎**（定点软件光栅化 + Z-buffer + GDI 窗口，~320 FPS）：见 [demos/3d/](./demos/3d/)
 - 🏆 **自举已完成**（编译器用自己写、自己编译、**产物与自身逐字节一致**）：见 [`交接文档-自举完成.md`](./交接文档-自举完成.md)；日常构建用 `tools/selfbuild.ps1`（Windows 原生，无需 Python）；
   编译器已支持 CLI：`build\wkcc2.exe 源.wk [输出.exe]`
 
@@ -204,45 +205,44 @@ python tools\dbg_x64.py        REM 容器 → 运行时 → 打印，逐级验�
 python tools\dbg_bisect.py     REM 按功能二分定位崩溃
 ```
 
-## 为什么编译器现在还是 Python 写的？——自举路线
+## 自举路线（已完成 ✅）
 
-因为**自举得先有地基**：要用 Whisker 写 Whisker 的编译器，语言本身得先能读文件、能攒字节、能吐字节。这一步一直在按顺序补：
+编译器的终极验收：**用 Whisker 写 Whisker 的编译器，产物与自身逐字节一致（fixpoint）**。
 
 | 步骤 | 状态 |
 |---|---|
 | ① 语言能跑（前端 + 自研后端 + 运行时） | ✅ M0/M1 |
-| ② 去掉 C / LLVM，链路完全自研 | ✅ 自研 x64 编码器 + PE 写出器 |
+| ② 去掉 C / LLVM（自研编码器 + PE 写出器） | ✅ |
 | ③ 语法定型（Python 味语句 + 括号层次 + 函数 + 控制流） | ✅ |
-| ④ **编译器要用的基础设施：数组 + 文件读写 + 十六进制** | ✅ 本轮完成 |
-| ⑤ 自举原语：`Ptr` + 内存读写 + `strCat`/`intToStr` + **用 Whisker 实现的动态缓冲区** | ✅ 本轮完成（`tests/x64/ptr.wk`） |
-| ⑥ 用 Whisker 走通"构造字节 → 落盘 → 读回校验"（`.wko` 格式） | ✅ 本轮验证（`examples/wko.wk`） |
-| ⑦ **用 Whisker 重写前端·词法器** —— 与 Python 词法器 token 流逐字比对 | ✅ **21 份样本 / 4424 个 token 全部一致**（`tools/lexsource.wk` + `tools/compare_lexer.py`） |
-| ⑧ **用 Whisker 重写前端·语法分析器** —— AST 序列逐字节比对 | ✅ **21 份样本全部一致**（`tools/wkcc.wk` + `tools/compare_parser.py`） |
-| ⑨ 用 Whisker 重写后端（运行时 blob 嵌入 + PE 生成器）—— 纵切验证：产出的 exe 能跑 | 🔶 **已验证**（`tools/pegen.wk` 产出 `selfhost.exe` 打印 42）——全语言代码发射覆盖中 |
-| ⑩ Python 版退役到 `legacy/`，`whiskerc.exe` 由 Whisker 自己编译自己 | ⬜ ⑨ 全覆盖后达成 |
+| ④~⑧ 基础设施 → 词法器 → 语法分析器逐字/逐字节比对 | ✅ 21 样本全一致 |
+| ⑨ 自研后端（blob 嵌入 + PE 生成器）· 全语言代码发射 | ✅ |
+| ⑩ **自举完成：`wkcc2.exe` 编译自身，产物逐字节一致；Python 版退役为应急引导** | ✅ **2026-10-28** |
 
-当下（第⑨步收尾）：一遍式语法导向翻译的纵切已通——运行时机器码以 blob 形式嵌入（`tools/extract_runtime.py` 提取为 `build/rt_blob.bin`），Whisker 写的 PE 生成器拼出完整 PE。剩余工作是把 `wkcc.wk` 解析器里的 AST dump 行替换为代码发射（照 Python 版 `codegen_x64.py` 的语义），覆盖全语言后即可退役 Python 版。
+之后持续加固（2026-11）：`and/or` 短路语义、`ptrToInt/intToPtr`、strbuf 标准库、
+系统原语（TCP/进程/时钟）、agent 原语（截图/鼠标/键盘）、四 DLL 导入表、
+帧动态对齐（根治嵌套调用栈未对齐）、**CLI 参数化**（`wkcc2 源.wk [输出.exe] [blob]`）。
 
-> 顺带说明：`legacy/` 里的 C 对照后端已经退役；Python 版编译器**暂时**是唯一的实现，退役条件是第⑨步全覆盖、第⑩步自举完成。
+> `whiskerc`（Python 前端）现仅作**应急引导链**保留：`wkcc2` 损坏时可重建，
+> 日常构建零 Python（`tools/selfbuild.ps1` 一条命令）。
+
 
 ## 当前状态
 
-**M1 完成**：语言不依赖 C，调度器是真线程，语法按"Python 味语句 + 花括号结构"重做。
+**自举完成（fixpoint 逐字节一致）+ 系统能力扩展**。
 
-- **编译链路**：`whiskerc` 前端 → 自研 x86-64 编码器 → 自研 PE 写出器 → Windows 原生 exe。**无 C / C++ / LLVM / 链接器**，运行时也是自研机器码。
-- **并发**：24 工作线程池 + 全局自旋锁 + 事件唤醒（空闲不烧核）；主线程等系统静止。
-- **语法**：Python 味语句、括号层次（`{}` 最大 → `[]` 中等 → `()` 最小），`def` 函数 / `return` / `for` 区间循环 / `break` / `continue` / `elif` / `and` `or` `not`。
-- **代码生成质量**：局部变量放被调用者保存寄存器、算符直接吃内存/立即数操作数、常量折叠、公共子表达式消除、**除以常数用乘魔数+移位代替 `idiv`**。
-- **语言能力**：Actor 模型 + 消息 + 邮箱、`def` 函数、`for` 区间循环、数组（定长，带边界检查）、字节级文件读写、十六进制字面量、静态消息类型检查。
-- **验收**：`python tools\verify.py` **20/20 通过**。
+- **编译链路**：`whiskerc` 前端 → 自研 x86-64 编码器 → 自研 PE 写出器 → Windows 原生 exe；
+  自举编译器 `wkcc2.exe`（Whisker 写成）日常构建零 Python。**无 C / C++ / LLVM / 链接器 / libc**。
+- **并发**：24 工作线程池 + 全局自旋锁 + 事件唤醒；主线程等系统静止。
+- **语言能力**：Actor + 消息、`def`、区间循环、数组（带边界检查）、`Ptr` 与内存原语、
+  字符串内置、`and/or` 短路、指针 cast（`ptrToInt/intToPtr`）、`cmdline()`。
+- **系统原语**：TCP socket（含回环绑定）/ 进程启动与管道捕获 / 墙钟与睡眠。
+- **agent 原语**：截屏（GDI→BMP）/ 鼠标 / 键盘（虚拟键码）。
+- **标准库**：`strbuf`（动态字符串，倍增扩容）。
+- **工具链**：CLI 编译（`wkcc2 源.wk [输出.exe] [blob]`）、便携 SDK、`wk.ps1` 构建驱动。
+- **验收**：`verify_cp` **21/21** · `verify_boot` **15/15**（自举侧语义，含缺陷固化用例）·
+  `verify_sys` **3/3 ×双编译器**（系统原语）· `selfbuild.ps1` fixpoint 复验。
+- **实测性能**：`fanout` 并行段 49ms（约 1.5× MSVC -O2 的等价 C）；调度 20 万消息级场景全绿。
 
-### 实测性能（本机 24 逻辑核）
-
-| 场景 | 语言早期 | 现在 |
-|---|---|---|
-| `fanout` 串行段（2 亿次取模平方累加） | 1400 ms | **238 ms（5.9 倍）** |
-| `fanout` 并行段（64 Actor 分片） | 219 ms | **49 ms（4.5 倍）** |
-
-对比参考：MSVC `-O2` 编译的等价 C 版本是 164 ms / 35 ms（该 C 版本已退役到 `legacy/`）。也就是**自研后端目前约 1.5 倍于 -O2 C**（刚写出后端时是 8~9 倍）。
-
-**已知欠账（下一步）**：动态长度缓冲区、字符串拼接/插值、`Ptr` 底层访问、消息参数 > 3、除零运行时检查、Actor 生命周期与内存回收；`sender`/`protocol`、邮箱背压、监督树与崩溃隔离。详见 [`进度.md`](./进度.md) 第六节。
+**已知欠账**：`use`/include（现用 def 片段拼接）、`defer`、错误码约定（strerror 注册表）、
+跨 actor 前向 spawn、keep-alive、静态文件 >256KB 流式（截屏另走 8MB 专用路由）。
+详见 [`进度.md`](./进度.md) 断点与 [`交接文档-自举完成.md`](./交接文档-自举完成.md)（含设计宪法第 11 节）。

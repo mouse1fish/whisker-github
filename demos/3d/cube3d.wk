@@ -1,0 +1,385 @@
+# cube3d.wk —— Whisker 3D 引擎（定点 16.16 软件光栅化 + GDI 窗口呈现）
+#
+# 特性：
+#   - 全定点（16.16）数学：旋转矩阵 / 透视投影 / 光照，无浮点（语言暂无 float 类型）
+#   - Z-buffer 隐藏面消除 + 背面剔除 + 逐三角形平面着色（方向光）
+#   - 窗口模式：GDI 窗口 + StretchDIBits 推帧；方向键旋转、ESC 退出、FPS 统计
+#   - 无头模式：渲染 N 帧存 BMP（可自动化验证）
+#
+# 运行：
+#   cube3d.exe              窗口模式（方向键旋转 / ESC 退出）
+#   cube3d.exe --headless   无头模式：渲染 3 帧到 build/3d_frame*.bmp
+
+actor Main {
+    # ---- 数学常量（16.16 定点：1.0 = 65536）----
+    ONE: Int = 65536
+    FOCAL: Int = 27525120          # 焦距 = 420 * 65536（字段初值须为字面量）
+    CAMZ: Int = 262144             # 立方体中心 z = 4 * 65536
+    # 光照方向（近单位向量，16.16）：(-0.5, -0.7, 0.5)
+    LX: Int = -32768
+    LY: Int = -45875
+    LZ: Int = 32768
+
+    # ---- 画面 ----
+    W: Int = 480
+    H: Int = 360
+    fb: Ptr                        # BGRA 帧缓冲
+    zb: Ptr                        # 深度缓冲（每像素 8 字节，16.16）
+    spinX: Int = 0                 # 旋转角 0..255（256 步整圆）
+    spinY: Int = 0
+
+    # ---- 场景：8 顶点 + 12 三角形（36 索引）+ 每三角形颜色分量 ----
+    vx: Int[8]
+    vy: Int[8]
+    vz: Int[8]
+    fv: Int[36]
+    fB: Int[12]
+    fG: Int[12]
+    fR: Int[12]
+
+    # ---- 每帧变换结果 ----
+    wx: Int[8]                     # 旋转后坐标（16.16）
+    wy: Int[8]
+    wz: Int[8]
+    px: Int[8]                     # 投影后像素坐标（整数）
+    py: Int[8]
+    pz: Int[8]                     # 深度（16.16）
+
+    on Start {
+        fb = alloc(W * H * 4)
+        zb = alloc(W * H * 8)
+        initCube()
+        if strHas(cmdline(), "--headless") {
+            runHeadless(3)
+        } else {
+            runWindowed()
+        }
+    }
+
+    # ============ 场景初始化 ============
+    def initCube {
+        i: Int = 0
+        while i < 8 {
+            sx2: Int = 1
+            if i % 2 == 1 { sx2 = 0 - 1 }
+            sy2: Int = 1
+            if (i / 2) % 2 == 1 { sy2 = 0 - 1 }
+            sz2: Int = 1
+            if (i / 4) % 2 == 1 { sz2 = 0 - 1 }
+            vx[i] = sx2 * ONE
+            vy[i] = sy2 * ONE
+            vz[i] = sz2 * ONE
+            i = i + 1
+        }
+            # 六个面（各 2 三角形）：前 后 左 右 上 下（索引表内联）
+        fv[0] = 4
+        fv[1] = 5
+        fv[2] = 6
+        fv[3] = 4
+        fv[4] = 6
+        fv[5] = 7
+        fv[6] = 1
+        fv[7] = 0
+        fv[8] = 3
+        fv[9] = 1
+        fv[10] = 3
+        fv[11] = 2
+        fv[12] = 0
+        fv[13] = 4
+        fv[14] = 7
+        fv[15] = 0
+        fv[16] = 7
+        fv[17] = 3
+        fv[18] = 5
+        fv[19] = 1
+        fv[20] = 2
+        fv[21] = 5
+        fv[22] = 2
+        fv[23] = 6
+        fv[24] = 7
+        fv[25] = 6
+        fv[26] = 2
+        fv[27] = 7
+        fv[28] = 2
+        fv[29] = 3
+        fv[30] = 0
+        fv[31] = 1
+        fv[32] = 5
+        fv[33] = 0
+        fv[34] = 5
+        fv[35] = 4
+        # 面底色（B, G, R）内联
+        fB[0] = 60
+        fG[0] = 60
+        fR[0] = 220
+        fB[1] = 60
+        fG[1] = 60
+        fR[1] = 220
+        fB[2] = 60
+        fG[2] = 190
+        fR[2] = 60
+        fB[3] = 60
+        fG[3] = 190
+        fR[3] = 60
+        fB[4] = 220
+        fG[4] = 90
+        fR[4] = 50
+        fB[5] = 220
+        fG[5] = 90
+        fR[5] = 50
+        fB[6] = 50
+        fG[6] = 200
+        fR[6] = 210
+        fB[7] = 50
+        fG[7] = 200
+        fR[7] = 210
+        fB[8] = 200
+        fG[8] = 60
+        fR[8] = 200
+        fB[9] = 200
+        fG[9] = 60
+        fR[9] = 200
+        fB[10] = 210
+        fG[10] = 200
+        fR[10] = 60
+        fB[11] = 210
+        fG[11] = 200
+        fR[11] = 60
+    }
+
+
+
+    # ============ 变换与投影 ============
+    # 旋转角 -> 每个顶点旋转后坐标（Ry(ay) * Rx(ax) * v）
+    def transformAll {
+        cx: Int = cos16(spinX)
+        sx1: Int = sin16(spinX)
+        cy: Int = cos16(spinY)
+        sy1: Int = sin16(spinY)
+        i: Int = 0
+        while i < 8 {
+            x0: Int = vx[i]
+            y0: Int = vy[i]
+            z0: Int = vz[i]
+            # 绕 X：y' = cy*x0 - sy*z0 ... 采用 y1 = y0*cx - z0*sx ; z1 = y0*sx + z0*cx
+            y1: Int = (y0 * cx - z0 * sx1) / ONE
+            z1: Int = (y0 * sx1 + z0 * cx) / ONE
+            # 绕 Y：x2 = x0*cy + z1*sy ; z2 = -x0*sy + z1*cy
+            x2: Int = (x0 * cy + z1 * sy1) / ONE
+            z2: Int = (0 - x0 * sy1 + z1 * cy) / ONE
+            wx[i] = x2
+            wy[i] = y1
+            wz[i] = z2
+            i = i + 1
+        }
+    }
+
+    # 透视投影：屏幕 = 中心 + (旋转坐标 * 焦距) / 深度
+    def projectAll {
+        i: Int = 0
+        while i < 8 {
+            zt: Int = wz[i] + CAMZ             # 相机前移（16.16）
+            # 屏幕偏移 = ((世界坐标(16.16) * 焦距(16.16)) / 深度(16.16)) / ONE -> 像素
+            px[i] = W / 2 + (wx[i] * FOCAL / zt) / ONE
+            py[i] = H / 2 - (wy[i] * FOCAL / zt) / ONE
+            pz[i] = zt
+            i = i + 1
+        }
+    }
+
+    # ============ 光栅化 ============
+    def clearFrame {
+        bg: Int = 30 + (26 * 256) + (22 * 65536)   # 深色背景 BGRA 打包（低 32 位）
+        b64: Int = bg + bg * 4294967296            # 两个像素打包成 64 位
+        n: Int = W * H / 2
+        i: Int = 0
+        while i < n {
+            store64(ptrAdd(fb, i * 8), b64)
+            i = i + 1
+        }
+        # 深度清为最大值
+        zi: Int = 0
+        while zi < W * H {
+            store64(ptrAdd(zb, zi * 8), 4611686018427387903)
+            zi = zi + 1
+        }
+    }
+
+    def drawTri[ti: Int] {
+        i0: Int = fv[ti * 3]
+        i1: Int = fv[ti * 3 + 1]
+        i2: Int = fv[ti * 3 + 2]
+        x0: Int = px[i0]
+        y0: Int = py[i0]
+        x1: Int = px[i1]
+        y1: Int = py[i1]
+        x2: Int = px[i2]
+        y2: Int = py[i2]
+        z0: Int = pz[i0]
+        z1: Int = pz[i1]
+        z2: Int = pz[i2]
+        area: Int = (x1 - x0) * (y2 - y0) - (y1 - y0) * (x2 - x0)
+        if area != 0 {
+            if area < 0 {
+                # 归一化为逆时针（交换 v1/v2）
+                tx: Int = x1
+                ty: Int = y1
+                tz: Int = z1
+                x1 = x2
+                y1 = y2
+                z1 = z2
+                x2 = tx
+                y2 = ty
+                z2 = tz
+                area = 0 - area
+            }
+            shade: Int = faceShade(ti)
+            sb: Int = fB[ti] * shade / ONE
+            sg: Int = fG[ti] * shade / ONE
+            sr: Int = fR[ti] * shade / ONE
+            # 包围盒
+            xmin: Int = x0
+            if x1 < xmin { xmin = x1 }
+            if x2 < xmin { xmin = x2 }
+            xmax: Int = x0
+            if x1 > xmax { xmax = x1 }
+            if x2 > xmax { xmax = x2 }
+            ymin: Int = y0
+            if y1 < ymin { ymin = y1 }
+            if y2 < ymin { ymin = y2 }
+            ymax: Int = y0
+            if y1 > ymax { ymax = y1 }
+            if y2 > ymax { ymax = y2 }
+            if xmin < 0 { xmin = 0 }
+            if ymin < 0 { ymin = 0 }
+            if xmax > W - 1 { xmax = W - 1 }
+            if ymax > H - 1 { ymax = H - 1 }
+            y: Int = ymin
+            while y <= ymax {
+                x: Int = xmin
+                while x <= xmax {
+                    w0: Int = (x1 - x) * (y2 - y) - (y1 - y) * (x2 - x)
+                    w1: Int = (x2 - x) * (y0 - y) - (y2 - y) * (x0 - x)
+                    w2: Int = (x0 - x) * (y1 - y) - (y0 - y) * (x1 - x)
+                    if w0 >= 0 and w1 >= 0 and w2 >= 0 {
+                        znum: Int = z0 * w0 + z1 * w1 + z2 * w2
+                        z: Int = znum / area
+                        idx: Int = y * W + x
+                        old: Int = load64(ptrAdd(zb, idx * 8))
+                        if z < old {
+                            store64(ptrAdd(zb, idx * 8), z)
+                            p: Ptr = ptrAdd(fb, idx * 4)
+                            store8(p, sb)
+                            store8(ptrAdd(p, 1), sg)
+                            store8(ptrAdd(p, 2), sr)
+                            store8(ptrAdd(p, 3), 0)
+                        }
+                    }
+                    x = x + 1
+                }
+                y = y + 1
+            }
+        }
+    }
+
+    # 面法线（旋转后）· 光照方向 -> 亮度（0.3 环境 + 0.7 漫反射）
+    def faceShade[ti: Int] -> Int {
+        i0: Int = fv[ti * 3]
+        i1: Int = fv[ti * 3 + 1]
+        i2: Int = fv[ti * 3 + 2]
+        ax1: Int = wx[i1] - wx[i0]
+        ay1: Int = wy[i1] - wy[i0]
+        az1: Int = wz[i1] - wz[i0]
+        bx1: Int = wx[i2] - wx[i0]
+        by1: Int = wy[i2] - wy[i0]
+        bz1: Int = wz[i2] - wz[i0]
+        nx: Int = (ay1 * bz1 - az1 * by1) / ONE
+        ny: Int = (az1 * bx1 - ax1 * bz1) / ONE
+        nz: Int = (ax1 * by1 - ay1 * bx1) / ONE
+        d: Int = (nx * LX + ny * LY + nz * LZ) / ONE
+        if d < 0 { d = 0 }
+        if d > ONE { d = ONE }
+        return ONE * 30 / 100 + d * 70 / 100
+    }
+
+    def renderFrame {
+        clearFrame()
+        transformAll()
+        projectAll()
+        t: Int = 0
+        while t < 12 {
+            drawTri(t)
+            t = t + 1
+        }
+    }
+
+    # ============ 输出：原始帧落盘（无头模式，便于自动化校验）============
+    def saveRaw[path: Str] {
+        writeBytes(path, fb, W * H * 4)
+        print("[3d] ", path, " ", W, "x", H)
+    }
+
+    def runHeadless[n: Int] {
+        i: Int = 0
+        while i < n {
+            spinX = i * 24
+            spinY = i * 40
+            renderFrame()
+            saveRaw(strCat(strCat("build/3d_frame", intToStr(i)), ".px"))
+            print("帧 ", i, " 已渲染")
+            i = i + 1
+        }
+        print("无头渲染完成")
+    }
+
+    # ============ 窗口模式 ============
+    def runWindowed {
+        r: Int = winOpen("Whisker 3D - Fixed-Point Software Rasterizer", W, H)
+        if r == 0 {
+            print("开窗失败")
+            return
+        }
+        live: Int = 1
+        frames: Int = 0
+        t0: Int = wallMs()
+        while live == 1 {
+            renderFrame()
+            winPresent(fb, W, H)
+            if winPump() == 0 { live = 0 }
+            if keyAsync(27) != 0 { live = 0 }       # ESC
+            if keyAsync(37) != 0 { spinY = spinY + 2 }   # ←
+            if keyAsync(39) != 0 { spinY = spinY - 2 }   # →
+            if keyAsync(38) != 0 { spinX = spinX + 2 }   # ↑
+            if keyAsync(40) != 0 { spinX = spinX - 2 }   # ↓
+            frames = frames + 1
+            if frames % 30 == 0 {
+                dt: Int = wallMs() - t0
+                if dt > 0 { print("FPS = ", 30000 / dt) }
+                t0 = wallMs()
+            }
+        }
+        winClose()
+        print("共渲染 ", frames, " 帧")
+    }
+
+    # 子串包含（CLI 参数判断）
+    def strHas[s: Str, sub: Str] -> Bool {
+        n: Int = strLen(s)
+        m: Int = strLen(sub)
+        i: Int = 0
+        got: Int = 0
+        while i + m <= n {
+            j: Int = 0
+            ok: Int = 1
+            while j < m {
+                if load8(ptrAdd(strPtr(s), i + j)) != load8(ptrAdd(strPtr(sub), j)) {
+                    ok = 0
+                }
+                j = j + 1
+            }
+            if ok == 1 { got = 1 }
+            i = i + 1
+        }
+        return got == 1
+    }
+}

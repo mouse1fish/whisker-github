@@ -65,31 +65,39 @@ actor Main {
     OFF_PROC_FREE: Int = 5036
     # ---- agent 原语（EonOS：屏幕/鼠标/键盘）----
     OFF_CMDLINE: Int = 5107
-    OFF_SCREEN_W: Int = 5133
-    OFF_SCREEN_H: Int = 5165
-    OFF_MOUSE_X: Int = 5201
-    OFF_MOUSE_Y: Int = 5266
-    OFF_MOUSE_MOVE: Int = 5332
-    OFF_MOUSE_DOWN: Int = 5361
-    OFF_MOUSE_UP: Int = 5469
-    OFF_KEY_DOWN: Int = 5581
-    OFF_KEY_UP: Int = 5619
-    OFF_KEY_VK: Int = 5661
-    OFF_SCREENSHOT: Int = 5694
-    RT_TEXT_LEN: Int = 6248
-    RT_RDATA_LEN: Int = 1383
-    RT_DATA_LEN: Int = 18168
-    RT_DATA_OFF: Int = 7631            # blob bin 内 data 段起点 = RT_TEXT_LEN + RT_RDATA_LEN
+    # ---- 3D 引擎（窗口 + 定点三角）----
+    OFF_SIN16: Int = 5137
+    OFF_COS16: Int = 5133
+    OFF_WIN_OPEN: Int = 5361
+    OFF_WIN_PRESENT: Int = 5737
+    OFF_WIN_PUMP: Int = 5986
+    OFF_WIN_CLOSE: Int = 6113
+    OFF_KEY_ASYNC: Int = 6169
+    OFF_SCREEN_W: Int = 6202
+    OFF_SCREEN_H: Int = 6234
+    OFF_MOUSE_X: Int = 6270
+    OFF_MOUSE_Y: Int = 6335
+    OFF_MOUSE_MOVE: Int = 6401
+    OFF_MOUSE_DOWN: Int = 6430
+    OFF_MOUSE_UP: Int = 6538
+    OFF_KEY_DOWN: Int = 6650
+    OFF_KEY_UP: Int = 6688
+    OFF_KEY_VK: Int = 6730
+    OFF_SCREENSHOT: Int = 6763
+    RT_TEXT_LEN: Int = 7317
+    RT_RDATA_LEN: Int = 1824
+    RT_DATA_LEN: Int = 19576
+    RT_DATA_OFF: Int = 9141            # blob bin 内 data 段起点 = RT_TEXT_LEN + RT_RDATA_LEN
     RDATA_RVA: Int = 135168            # 0x21000（.text 预留 0x20000 = 128KB 给用户代码）
     DATA_RVA: Int = 200704             # 0x31000
     IMAGE_SIZE: Int = 221184           # 0x36000
-    IAT_RVA: Int = 218472              # 0x35530 = DATA_RVA + IAT_IN_DATA
-    IAT_IN_DATA: Int = 17768
-    NIMPORT: Int = 48
-    NIMP_KERNEL32: Int = 22
+    IAT_RVA: Int = 219744              # 0x35530 = DATA_RVA + IAT_IN_DATA
+    IAT_IN_DATA: Int = 19040
+    NIMPORT: Int = 66
+    NIMP_KERNEL32: Int = 23
     NIMP_WS2: Int = 12
-    NIMP_USER32: Int = 8
-    NIMP_GDI32: Int = 7
+    NIMP_USER32: Int = 23
+    NIMP_GDI32: Int = 8
     USER_OFF: Int = 8192
 
 
@@ -144,8 +152,8 @@ actor Main {
     blob: Ptr
     out: Ptr
     w: Int = 0
-    hintRVA: Int[64]
-    inames: Str[64]
+    hintRVA: Int[96]
+    inames: Str[96]
     # ---- 局部变量表（函数级扁平，同名复用槽）----
     localName: Str[256]
     localDisp: Int[256]     # [rbp + disp]（disp 为负）
@@ -210,33 +218,50 @@ actor Main {
         inames[19] = "CreatePipe"
         inames[20] = "SetHandleInformation"
         inames[21] = "GetCommandLineA"
-        inames[22] = "WSAStartup"
-        inames[23] = "socket"
-        inames[24] = "inet_addr"
-        inames[25] = "htons"
-        inames[26] = "bind"
-        inames[27] = "listen"
-        inames[28] = "accept"
-        inames[29] = "connect"
-        inames[30] = "send"
-        inames[31] = "recv"
-        inames[32] = "closesocket"
-        inames[33] = "WSAGetLastError"
-        inames[34] = "GetDC"
-        inames[35] = "ReleaseDC"
-        inames[36] = "GetSystemMetrics"
-        inames[37] = "SetCursorPos"
-        inames[38] = "mouse_event"
-        inames[39] = "keybd_event"
-        inames[40] = "VkKeyScanA"
-        inames[41] = "GetCursorPos"
-        inames[42] = "CreateCompatibleDC"
-        inames[43] = "CreateCompatibleBitmap"
-        inames[44] = "SelectObject"
-        inames[45] = "BitBlt"
-        inames[46] = "GetDIBits"
-        inames[47] = "DeleteDC"
-        inames[48] = "DeleteObject"
+        inames[22] = "GetModuleHandleA"
+        inames[23] = "WSAStartup"
+        inames[24] = "socket"
+        inames[25] = "inet_addr"
+        inames[26] = "htons"
+        inames[27] = "bind"
+        inames[28] = "listen"
+        inames[29] = "accept"
+        inames[30] = "connect"
+        inames[31] = "send"
+        inames[32] = "recv"
+        inames[33] = "closesocket"
+        inames[34] = "WSAGetLastError"
+        inames[35] = "GetDC"
+        inames[36] = "ReleaseDC"
+        inames[37] = "GetSystemMetrics"
+        inames[38] = "SetCursorPos"
+        inames[39] = "mouse_event"
+        inames[40] = "keybd_event"
+        inames[41] = "VkKeyScanA"
+        inames[42] = "GetCursorPos"
+        inames[43] = "RegisterClassExA"
+        inames[44] = "CreateWindowExA"
+        inames[45] = "DefWindowProcA"
+        inames[46] = "ShowWindow"
+        inames[47] = "UpdateWindow"
+        inames[48] = "GetClientRect"
+        inames[49] = "PeekMessageA"
+        inames[50] = "TranslateMessage"
+        inames[51] = "DispatchMessageA"
+        inames[52] = "GetAsyncKeyState"
+        inames[53] = "DestroyWindow"
+        inames[54] = "PostQuitMessage"
+        inames[55] = "LoadCursorA"
+        inames[56] = "BeginPaint"
+        inames[57] = "EndPaint"
+        inames[58] = "CreateCompatibleDC"
+        inames[59] = "CreateCompatibleBitmap"
+        inames[60] = "SelectObject"
+        inames[61] = "BitBlt"
+        inames[62] = "GetDIBits"
+        inames[63] = "DeleteDC"
+        inames[64] = "DeleteObject"
+        inames[65] = "StretchDIBits"
     }
 
     # ================= 词法（与之前版本相同） =================
@@ -315,33 +340,50 @@ actor Main {
         inames[19] = "CreatePipe"
         inames[20] = "SetHandleInformation"
         inames[21] = "GetCommandLineA"
-        inames[22] = "WSAStartup"
-        inames[23] = "socket"
-        inames[24] = "inet_addr"
-        inames[25] = "htons"
-        inames[26] = "bind"
-        inames[27] = "listen"
-        inames[28] = "accept"
-        inames[29] = "connect"
-        inames[30] = "send"
-        inames[31] = "recv"
-        inames[32] = "closesocket"
-        inames[33] = "WSAGetLastError"
-        inames[34] = "GetDC"
-        inames[35] = "ReleaseDC"
-        inames[36] = "GetSystemMetrics"
-        inames[37] = "SetCursorPos"
-        inames[38] = "mouse_event"
-        inames[39] = "keybd_event"
-        inames[40] = "VkKeyScanA"
-        inames[41] = "GetCursorPos"
-        inames[42] = "CreateCompatibleDC"
-        inames[43] = "CreateCompatibleBitmap"
-        inames[44] = "SelectObject"
-        inames[45] = "BitBlt"
-        inames[46] = "GetDIBits"
-        inames[47] = "DeleteDC"
-        inames[48] = "DeleteObject"
+        inames[22] = "GetModuleHandleA"
+        inames[23] = "WSAStartup"
+        inames[24] = "socket"
+        inames[25] = "inet_addr"
+        inames[26] = "htons"
+        inames[27] = "bind"
+        inames[28] = "listen"
+        inames[29] = "accept"
+        inames[30] = "connect"
+        inames[31] = "send"
+        inames[32] = "recv"
+        inames[33] = "closesocket"
+        inames[34] = "WSAGetLastError"
+        inames[35] = "GetDC"
+        inames[36] = "ReleaseDC"
+        inames[37] = "GetSystemMetrics"
+        inames[38] = "SetCursorPos"
+        inames[39] = "mouse_event"
+        inames[40] = "keybd_event"
+        inames[41] = "VkKeyScanA"
+        inames[42] = "GetCursorPos"
+        inames[43] = "RegisterClassExA"
+        inames[44] = "CreateWindowExA"
+        inames[45] = "DefWindowProcA"
+        inames[46] = "ShowWindow"
+        inames[47] = "UpdateWindow"
+        inames[48] = "GetClientRect"
+        inames[49] = "PeekMessageA"
+        inames[50] = "TranslateMessage"
+        inames[51] = "DispatchMessageA"
+        inames[52] = "GetAsyncKeyState"
+        inames[53] = "DestroyWindow"
+        inames[54] = "PostQuitMessage"
+        inames[55] = "LoadCursorA"
+        inames[56] = "BeginPaint"
+        inames[57] = "EndPaint"
+        inames[58] = "CreateCompatibleDC"
+        inames[59] = "CreateCompatibleBitmap"
+        inames[60] = "SelectObject"
+        inames[61] = "BitBlt"
+        inames[62] = "GetDIBits"
+        inames[63] = "DeleteDC"
+        inames[64] = "DeleteObject"
+        inames[65] = "StretchDIBits"
     }
 
     def peek[o: Int] -> Int {
@@ -2107,6 +2149,35 @@ actor Main {
                 if name == "cmdline" {
                     ePopArgs(nargs, 0)
                     eCallRt(OFF_CMDLINE); lastTy = "Str"; return
+                }
+                # ---- 3D 引擎 ----
+                if name == "winOpen" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_WIN_OPEN); lastTy = "Int"; return
+                }
+                if name == "winPresent" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_WIN_PRESENT); lastTy = "Int"; return
+                }
+                if name == "winPump" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_WIN_PUMP); lastTy = "Int"; return
+                }
+                if name == "winClose" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_WIN_CLOSE); lastTy = "Int"; return
+                }
+                if name == "keyAsync" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_KEY_ASYNC); lastTy = "Int"; return
+                }
+                if name == "sin16" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_SIN16); lastTy = "Int"; return
+                }
+                if name == "cos16" {
+                    ePopArgs(nargs, 0)
+                    eCallRt(OFF_COS16); lastTy = "Int"; return
                 }
                 # ---- agent 原语（EonOS）----
                 if name == "screenW" {

@@ -1,0 +1,2 @@
+[wkcc] 编译 build\shot_now.wk -> build\shot_now.exe
+build\shot_now.exe 写出 = 32768 字节

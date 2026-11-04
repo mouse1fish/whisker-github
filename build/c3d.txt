@@ -1,0 +1,2 @@
+[wkcc] 编译 demos\3d\cube3d.wk -> build\cube3d.exe
+build\cube3d.exe 写出 = 45568 字节

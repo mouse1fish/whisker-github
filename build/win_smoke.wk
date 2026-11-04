@@ -1,0 +1,29 @@
+# win_smoke.wk —— 最小开窗冒烟：渐变帧 + 泵消息 + ESC 退出
+actor Main {
+    on Start {
+        ok: Int = winOpen("Whisker 窗口冒烟", 320, 240)
+        print("winOpen=", ok)
+        fb: Ptr = alloc(320 * 240 * 4)
+        i: Int = 0
+        while i < 320 * 240 {
+            b: Int = i / 320
+            store8(ptrAdd(fb, i * 4), b)
+            store8(ptrAdd(fb, i * 4 + 1), 64)
+            store8(ptrAdd(fb, i * 4 + 2), 200)
+            store8(ptrAdd(fb, i * 4 + 3), 0)
+            i = i + 1
+        }
+        live: Int = 1
+        frames: Int = 0
+        while live == 1 {
+            winPresent(fb, 320, 240)
+            if winPump() == 0 { live = 0 }
+            if keyAsync(27) != 0 { live = 0 }
+            sleepMs(16)
+            frames = frames + 1
+            if frames >= 150 { live = 0 }
+        }
+        winClose()
+        print("帧数=", frames)
+    }
+}

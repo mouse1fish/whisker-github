@@ -1,0 +1,7 @@
+[3d] build/3d_frame0.px 480x360
+帧 0 已渲染
+[3d] build/3d_frame1.px 480x360
+帧 1 已渲染
+[3d] build/3d_frame2.px 480x360
+帧 2 已渲染
+无头渲染完成
