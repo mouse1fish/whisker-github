@@ -1,0 +1,2 @@
+[wkcc] 编译 cube3d_par.wk -> cube3d_par.exe
+[wkcc] blob 读取失败: build/rt_blob.bin（CWD 需为项目根，或用第 3 参数指定）

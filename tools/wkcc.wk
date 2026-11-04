@@ -818,7 +818,11 @@ actor Main {
 
         # 读运行时 blob
         blob = alloc(RT_DATA_OFF + RT_DATA_LEN + 16)
-        readBytes(blobPath, blob, RT_DATA_OFF + RT_DATA_LEN)
+        bn: Int = readBytes(blobPath, blob, RT_DATA_OFF + RT_DATA_LEN)
+        if bn < 0 {
+            print("[wkcc] blob 读取失败: ", blobPath, "（CWD 需为项目根，或用第 3 参数指定）")
+            return
+        }
 
         # 分配用户代码区（256KB）和 .rdata 区（256KB）
         # 依据：.text 窗口守卫限定 cw<=128KB，exe 总大小 <= ~180KB，256KB 有确定富余
