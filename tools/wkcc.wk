@@ -73,21 +73,21 @@ actor Main {
     OFF_WIN_PUMP: Int = 5986
     OFF_WIN_CLOSE: Int = 6113
     OFF_KEY_ASYNC: Int = 6169
-    OFF_SCREEN_W: Int = 6202
-    OFF_SCREEN_H: Int = 6234
-    OFF_MOUSE_X: Int = 6270
-    OFF_MOUSE_Y: Int = 6335
-    OFF_MOUSE_MOVE: Int = 6401
-    OFF_MOUSE_DOWN: Int = 6430
-    OFF_MOUSE_UP: Int = 6538
-    OFF_KEY_DOWN: Int = 6650
-    OFF_KEY_UP: Int = 6688
-    OFF_KEY_VK: Int = 6730
-    OFF_SCREENSHOT: Int = 6763
-    RT_TEXT_LEN: Int = 7317
+    OFF_SCREEN_W: Int = 6452
+    OFF_SCREEN_H: Int = 6484
+    OFF_MOUSE_X: Int = 6520
+    OFF_MOUSE_Y: Int = 6585
+    OFF_MOUSE_MOVE: Int = 6651
+    OFF_MOUSE_DOWN: Int = 6680
+    OFF_MOUSE_UP: Int = 6788
+    OFF_KEY_DOWN: Int = 6900
+    OFF_KEY_UP: Int = 6938
+    OFF_KEY_VK: Int = 6980
+    OFF_SCREENSHOT: Int = 7013
+    RT_TEXT_LEN: Int = 7567
     RT_RDATA_LEN: Int = 1824
     RT_DATA_LEN: Int = 19576
-    RT_DATA_OFF: Int = 9141            # blob bin 内 data 段起点 = RT_TEXT_LEN + RT_RDATA_LEN
+    RT_DATA_OFF: Int = 9391            # blob bin 内 data 段起点 = RT_TEXT_LEN + RT_RDATA_LEN
     RDATA_RVA: Int = 135168            # 0x21000（.text 预留 0x20000 = 128KB 给用户代码）
     DATA_RVA: Int = 200704             # 0x31000
     IMAGE_SIZE: Int = 221184           # 0x36000

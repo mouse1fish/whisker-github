@@ -213,6 +213,15 @@ class IntLit(Expr):
         self.value = value
 
 
+
+class FloatLit(Expr):
+    __slots__ = ("value",)
+
+    def __init__(self, value: int, line: int, col: int) -> None:
+        super().__init__(line, col)
+        self.value = value
+
+
 class BoolLit(Expr):
     __slots__ = ("value",)
 

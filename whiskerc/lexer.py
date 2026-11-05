@@ -159,6 +159,15 @@ def tokenize(src: str, diag: Diag) -> list[Token]:
             j = i
             while j < n and (src[j].isdigit() or src[j] == "_"):
                 j += 1
+            # 浮点：小数部分（. 后跟数字，区别于方法调用的 .标识符）
+            if j < n and src[j] == "." and j + 1 < n and src[j + 1].isdigit():
+                j += 1
+                while j < n and (src[j].isdigit() or src[j] == "_"):
+                    j += 1
+                text = src[i:j].replace("_", "")
+                advance(j - i)
+                push("float", text, start_line, start_col)
+                continue
             text = src[i:j].replace("_", "")
             advance(j - i)
             push("int", text, start_line, start_col)

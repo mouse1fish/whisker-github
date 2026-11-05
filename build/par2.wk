@@ -1,0 +1,53 @@
+# par2.wk —— 最小并行测试：2 个 Band，各渲染半屏渐变色
+actor Band {
+    W: Int = 64
+    H: Int = 32
+    fbP: Ptr
+    my: Int = 0
+    y0b: Int = 0
+    y1b: Int = 0
+    on Reg[fb: Int, idx: Int] {
+        fbP = intToPtr(fb)
+        my = idx
+        y0b = idx * H / 2
+        y1b = (idx + 1) * H / 2 - 1
+    }
+    on Tick[frame: Int] {
+        y: Int = y0b
+        while y <= y1b {
+            x: Int = 0
+            while x < W {
+                o: Int = (y * W + x) * 4
+                store8(ptrAdd(fbP, o), y % 256)
+                store8(ptrAdd(fbP, o + 1), x % 256)
+                store8(ptrAdd(fbP, o + 2), frame % 256)
+                store8(ptrAdd(fbP, o + 3), 0)
+                x = x + 1
+            }
+            y = y + 1
+        }
+        print("band ", my, " done ", frame)
+    }
+}
+actor Main {
+    W: Int = 64
+    H: Int = 32
+    fb: Ptr
+    b0: ActorRef[Band]
+    b1: ActorRef[Band]
+    on Start {
+        fb = alloc(W * H * 4)
+        fbi: Int = ptrToInt(fb)
+        b0 = spawn Band
+        b0.send(Reg(fbi, 0))
+        b1 = spawn Band
+        b1.send(Reg(fbi, 1))
+        f: Int = 0
+        while f < 3 {
+            b0.send(Tick(f))
+            b1.send(Tick(f))
+            f = f + 1
+        }
+        print("all sent")
+    }
+}

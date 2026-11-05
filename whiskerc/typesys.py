@@ -19,9 +19,10 @@ VOID = "Void"
 ACTORREF = "ActorRef"
 ARRAY = "Array"
 PTR = "Ptr"                    # 底层指针（不可空性靠 isNull 检查；不参与消息传递）
+FLOAT = "Float"                # IEEE 754 双精度（64 位位模式存于 8 字节）
 ERROR = "<error>"
 
-SCALARS = (INT, BOOL, STR, ACTORREF, PTR)
+SCALARS = (INT, BOOL, STR, ACTORREF, PTR, FLOAT)
 
 
 class Ty:
@@ -95,6 +96,7 @@ class Ty:
 
 
 INT_TY = Ty(INT)
+FLOAT_TY = Ty(FLOAT)
 BOOL_TY = Ty(BOOL)
 STR_TY = Ty(STR)
 VOID_TY = Ty(VOID)

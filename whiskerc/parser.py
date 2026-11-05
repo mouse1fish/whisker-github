@@ -374,6 +374,10 @@ class Parser:
     def parse_primary(self) -> A.Expr:
         t = self.peek()
 
+        if t.kind == "float":
+            import struct as _s
+            bits = _s.unpack("<Q", _s.pack("<d", float(t.text)))[0]
+            return A.FloatLit(bits, t.line, t.col)
         if t.kind == "int":
             self.next()
             return A.IntLit(int(t.text), t.line, t.col)

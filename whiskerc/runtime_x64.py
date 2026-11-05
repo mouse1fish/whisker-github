@@ -1595,6 +1595,39 @@ def emit_runtime(a: Asm, pe: PEBuilder) -> None:
     a.and_ri(RAX, 0x8000)
     f.close()
 
+    # ================= Float：SSE2 浮点原语（IEEE 754 位模式 ↔ XMM）=================
+    a.note("rt_fadd / rt_fsub / rt_fmul / rt_fdiv（rcx=a_bits, rdx=b_bits -> rax=result_bits）")
+    for name, opc in (("rt_fadd", 0x58), ("rt_fsub", 0x5C), ("rt_fmul", 0x59), ("rt_fdiv", 0x5E)):
+        a.label(name)
+        f = Frame(a)
+        a.movq_xmm_r64(0, RCX)               # movq xmm0, rcx
+        a.movq_xmm_r64(1, RDX)               # movq xmm1, rdx
+        a.emit(0xF2, 0x0F, opc, 0xC1)        # xmm0 = xmm0 op xmm1
+        a.movq_r64_xmm(RAX, 0)               # movq rax, xmm0
+        f.close()
+
+    a.note("rt_itof（rcx=Int -> rax=Float bits）/ rt_ftoi（rcx=Float bits -> rax=Int）")
+    a.label("rt_itof")
+    f = Frame(a)
+    a.cvtsi2sd(0, RCX)                       # cvtsi2sd xmm0, rcx
+    a.movq_r64_xmm(RAX, 0)                   # movq rax, xmm0
+    f.close()
+
+    a.label("rt_ftoi")
+    f = Frame(a)
+    a.movq_xmm_r64(0, RCX)                   # movq xmm0, rcx
+    a.cvttsd2si(RAX, 0)                      # cvttsd2si rax, xmm0
+    f.close()
+
+    a.note("rt_sqrt（rcx=Float bits -> rax=Float bits）")
+    a.label("rt_sqrt")
+    f = Frame(a)
+    a.movq_xmm_r64(0, RCX)
+    a.emit(0xF2, 0x0F, 0x51, 0xC0)           # sqrtsd xmm0, xmm0
+    a.movq_r64_xmm(RAX, 0)
+    f.close()
+
+
     a.note("rt_screen_w / rt_screen_h（GetSystemMetrics）")
     a.label("rt_screen_w")
     f = Frame(a)

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from . import ast_nodes as A
 from .diag import Diag
-from .typesys import (BOOL_TY, ERROR_TY, INT_TY, PTR_TY, STR_TY, VOID,
+from .typesys import (BOOL_TY, ERROR_TY, FLOAT_TY, INT_TY, PTR_TY, STR_TY, VOID,
                       VOID_TY, Ty, actorref, array_of, parse_type_name)
 
 ENTRY_ACTOR = "Main"
@@ -71,6 +71,8 @@ BUILTIN_SIGS: dict[str, tuple[list[Ty], Ty]] = {
     "keyUp": ([INT_TY], INT_TY),                        # 抬起虚拟键码
     "keyVk": ([INT_TY], INT_TY),                        # 字符 -> VK（低字节 VK，高字节 shift）
     "screenshot": ([STR_TY], INT_TY),                   # 截屏写 BMP 文件
+    "itof": ([INT_TY], FLOAT_TY),                       # Int -> Float
+    "ftoi": ([FLOAT_TY], INT_TY),                       # Float -> Int（截断）
     "ptrToInt": ([PTR_TY], INT_TY),                     # 指针 -> 整数（身份变换，句柄/地址算术用）
     "intToPtr": ([INT_TY], PTR_TY),                     # 整数 -> 指针（身份变换）
 }
