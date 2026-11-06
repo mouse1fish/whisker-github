@@ -5,6 +5,8 @@
 """
 from __future__ import annotations
 
+import struct
+
 from . import ast_nodes as A
 from .diag import Diag
 from .lexer import Token, TYPE_NAMES
@@ -377,6 +379,11 @@ class Parser:
         if t.kind == "int":
             self.next()
             return A.IntLit(int(t.text), t.line, t.col)
+
+        if t.kind == "float":
+            self.next()
+            bits = struct.unpack("<Q", struct.pack("<d", float(t.text)))[0]
+            return A.FloatLit(bits, t.line, t.col)
 
         if t.kind == "str":
             self.next()

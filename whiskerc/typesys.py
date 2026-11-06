@@ -20,8 +20,9 @@ ACTORREF = "ActorRef"
 ARRAY = "Array"
 PTR = "Ptr"                    # 底层指针（不可空性靠 isNull 检查；不参与消息传递）
 ERROR = "<error>"
+FLOAT = "Float"                # IEEE 754 双精度（位模式复用 64 位 Int 通道）
 
-SCALARS = (INT, BOOL, STR, ACTORREF, PTR)
+SCALARS = (INT, BOOL, STR, ACTORREF, PTR, FLOAT)
 
 
 class Ty:
@@ -99,6 +100,7 @@ BOOL_TY = Ty(BOOL)
 STR_TY = Ty(STR)
 VOID_TY = Ty(VOID)
 PTR_TY = Ty(PTR)
+FLOAT_TY = Ty(FLOAT)
 ERROR_TY = Ty(ERROR)
 
 
@@ -120,6 +122,8 @@ def parse_type_name(name: str, arg: str | None = None) -> Ty | None:
         return STR_TY
     if name == "Ptr" and arg is None:
         return PTR_TY
+    if name == "Float" and arg is None:
+        return FLOAT_TY
     if name == "ActorRef" and arg is not None:
         return actorref(arg)
     return None

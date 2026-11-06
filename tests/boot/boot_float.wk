@@ -1,0 +1,29 @@
+# Float 冒烟用例（自举侧回归锚点，2026-11-06）
+# 覆盖：itof/ftoi 转换、fadd/fsub/fmul/fdiv/fsqrt 算术、float 字面量、
+#       显式 Float 声明、嵌套 float 调用（fmul(q, itof(10))）
+actor Main {
+    on Start {
+        let a: Float = itof(7)
+        let b: Float = itof(2)
+        let s: Float = fadd(a, b)
+        let d: Float = fsub(a, b)
+        let m: Float = fmul(a, b)
+        let q: Float = fdiv(a, b)
+        let r: Float = fsqrt(itof(16))
+        print(ftoi(s))
+        print(ftoi(d))
+        print(ftoi(m))
+        print(ftoi(fmul(q, itof(10))))
+        print(ftoi(r))
+        print(ftoi(itof(12345)))
+        # float 字面量（词法器 + strToFbits 位模式编码）
+        let pi: Float = 3.14
+        let half: Float = 0.5
+        print(ftoi(fmul(pi, itof(100))))       # 3.14×100 = 314
+        print(ftoi(fadd(half, half)))          # 0.5+0.5 = 1
+        print(ftoi(fmul(2.5, itof(4))))        # 2.5×4 = 10
+        print(ftoi(fsub(itof(1), half)))       # 1-0.5 = 0.5 → 0（ftoi 向零截断）
+        print(ftoi(fadd(1.5, 2.25)))           # 3.75 → 3
+        print(ftoi(fmul(pi, pi)))              # 3.14² = 9.86 → 9
+    }
+}

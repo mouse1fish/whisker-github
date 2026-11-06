@@ -25,7 +25,7 @@ PUNCS = [
     "=", "<", ">", "+", "-", "*", "/", "%", "!", ".", "?",
 ]
 
-TYPE_NAMES = {"Int", "Bool", "Str", "ActorRef", "Ptr"}
+TYPE_NAMES = {"Int", "Bool", "Str", "ActorRef", "Ptr", "Float"}
 
 # 只有圆括号/中括号内部的换行被忽略（隐式续行）；
 # 花括号是「装语句的块」，里面的换行必须保留 —— 否则换行没法当语句结束符。
@@ -159,6 +159,15 @@ def tokenize(src: str, diag: Diag) -> list[Token]:
             j = i
             while j < n and (src[j].isdigit() or src[j] == "_"):
                 j += 1
+            # 浮点：小数部分（1.5 / 3.14；"1." 或 ".5" 不算浮点）
+            if j < n and src[j] == "." and j + 1 < n and src[j + 1].isdigit():
+                j += 1
+                while j < n and (src[j].isdigit() or src[j] == "_"):
+                    j += 1
+                text = src[i:j].replace("_", "")
+                advance(j - i)
+                push("float", text, start_line, start_col)
+                continue
             text = src[i:j].replace("_", "")
             advance(j - i)
             push("int", text, start_line, start_col)

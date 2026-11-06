@@ -24,6 +24,7 @@ actor Main {
     K_PUNC: Int = 4
     K_NL: Int = 5
     K_EOF: Int = 6
+    K_FLOAT: Int = 7
 
     def setup {
         kws[0] = "actor"
@@ -156,6 +157,9 @@ actor Main {
         if k == K_INT {
             return "int"
         }
+        if k == K_FLOAT {
+            return "float"
+        }
         if k == K_STR {
             return "str"
         }
@@ -229,6 +233,15 @@ actor Main {
             while isDigit(peek(0)) or peek(0) == 95 {
                 advance(1)
             }
+            # 浮点：'.' 后跟数字才算（"1." / ".5" 不算，与 Python 侧一致）
+            isF: Int = 0
+            if peek(0) == 46 and isDigit(peek(1)) {
+                isF = 1
+                advance(1)
+                while isDigit(peek(0)) or peek(0) == 95 {
+                    advance(1)
+                }
+            }
             # 十进制：原样保留数字，去掉下划线
             p: Ptr = alloc(pos - start + 1)
             w: Int = 0
@@ -242,7 +255,11 @@ actor Main {
                 r = r + 1
             }
             store8(ptrAdd(p, w), 0)
-            pushTok(K_INT, ptrToStr(p))
+            if isF == 1 {
+                pushTok(K_FLOAT, ptrToStr(p))
+            } else {
+                pushTok(K_INT, ptrToStr(p))
+            }
         }
     }
 

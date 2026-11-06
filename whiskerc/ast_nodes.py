@@ -213,6 +213,15 @@ class IntLit(Expr):
         self.value = value
 
 
+class FloatLit(Expr):
+    """浮点字面量：value 存 IEEE 754 双精度位模式（复用 64 位 Int 通道）。"""
+    __slots__ = ("value",)
+
+    def __init__(self, value: int, line: int, col: int) -> None:
+        super().__init__(line, col)
+        self.value = value
+
+
 class BoolLit(Expr):
     __slots__ = ("value",)
 

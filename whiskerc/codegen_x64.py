@@ -50,6 +50,8 @@ def const_int(e: A.Expr) -> int:
     """编译期常量表达式求值（字段初值 / 常量折叠都用它）"""
     if isinstance(e, A.IntLit):
         return e.value
+    if isinstance(e, A.FloatLit):
+        return e.value          # Float 以 IEEE 754 位模式存于 64 位通道
     if isinstance(e, A.BoolLit):
         return 1 if e.value else 0
     if isinstance(e, A.Unary):
@@ -101,7 +103,7 @@ def try_const(e: A.Expr) -> int | None:
 
 def is_pure(e: A.Expr) -> bool:
     """表达式是否有副作用（纯表达式才能做公共子表达式消除）"""
-    if isinstance(e, (A.IntLit, A.BoolLit, A.StrLit, A.Ident, A.SelfExpr)):
+    if isinstance(e, (A.IntLit, A.BoolLit, A.StrLit, A.FloatLit, A.Ident, A.SelfExpr)):
         return True
     if isinstance(e, A.Unary):
         return is_pure(e.operand)
@@ -605,6 +607,8 @@ class Fn:
         a.call("rt_print_begin")
         fns = {"Int": "rt_print_int", "Bool": "rt_print_bool", "Str": "rt_print_cstr"}
         for arg in call.args:
+            if getattr(arg, "ty", None) is not None and arg.ty.kind == "Float":
+                raise CodegenError("Float 打印暂不支持：请先 ftoi 转成 Int 再打印")
             self.eval(arg)
             a.mov_rr(RCX, RAX)
             a.call(fns[arg.ty.kind])
@@ -749,6 +753,9 @@ class Fn:
         if isinstance(e, A.IntLit):
             a.mov_ri(RAX, e.value)
             return
+        if isinstance(e, A.FloatLit):
+            a.movabs_ri(RAX, e.value)   # IEEE 754 位模式直接进 rax
+            return
         if isinstance(e, A.BoolLit):
             a.mov_ri(RAX, 1 if e.value else 0)
             return
@@ -851,6 +858,7 @@ class Fn:
                           "mouseMove", "mouseDown", "mouseUp",
                           "keyDown", "keyUp", "keyVk", "screenshot",
                           "sin16", "cos16", "keyAsync",
+                          "fadd", "fsub", "fmul", "fdiv", "fsqrt", "itof", "ftoi",
                           "winOpen", "winPresent", "winClose"):
                 self.builtin_call(e)
                 return
@@ -909,6 +917,20 @@ class Fn:
             self.eval(e.args[0])
             a.mov_rr(RCX, RAX)
             a.call("rt_alloc")
+            return
+
+        if name in ("fadd", "fsub", "fmul", "fdiv", "fsqrt", "itof", "ftoi"):
+            self.eval(e.args[0])
+            a.mov_rr(RCX, RAX)
+            if name in ("fadd", "fsub", "fmul", "fdiv"):
+                t = self.temp()
+                a.mov_mr(RSP, self.f.disp(t), RAX)   # 左操作数进临时槽，防被右求值破坏
+                self.eval(e.args[1])
+                a.mov_rr(RDX, RAX)
+                a.mov_rm(RCX, RSP, self.f.disp(t))
+            a.call({"fadd": "rt_fadd", "fsub": "rt_fsub", "fmul": "rt_fmul",
+                    "fdiv": "rt_fdiv", "fsqrt": "rt_fsqrt", "itof": "rt_itof",
+                    "ftoi": "rt_ftoi"}[name])
             return
 
         if name == "ptrAdd":                    # ptrAdd(p, off) -> Ptr

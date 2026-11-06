@@ -311,6 +311,84 @@ class Asm:
         返回 -1 的整型 API 必须符号扩展后再比较/使用。"""
         self.emit(0x48, 0x63, 0xC0)
 
+    # ================= SSE2 双精度（Float 原语用）=================
+    def _sse2_rr(self, prefix: int, opc: int, dst: int, src: int) -> None:
+        rex = 0x00
+        if dst >= 8:
+            rex |= 4
+        if src >= 8:
+            rex |= 1
+        modrm = 0xC0 | ((dst & 7) << 3) | (src & 7)
+        if rex:
+            self.emit(rex)
+        self.emit(prefix, 0x0F, opc, modrm)
+
+    def movq_xmm_r64(self, xmm: int, r64: int) -> None:
+        """movq xmm, r/m64（66 REX.W 0F 6E /r）— 64 位通用寄存器位模式进 XMM。
+        编码坑：F3 0F 7E 是 xmm<-xmm 形式，mod=11 时寄存器操作数被解释为 XMM
+        而非通用寄存器（读不到 rcx/rdx）；通用寄存器→XMM 必须用 66 REX.W 0F 6E
+        （MOVD 的 REX.W 版本）。XMM→通用寄存器才用 66 REX.W 0F 7E。"""
+        rex = 0x48
+        if xmm >= 8:
+            rex |= 4
+        if r64 >= 8:
+            rex |= 1
+        modrm = 0xC0 | ((xmm & 7) << 3) | (r64 & 7)
+        self.emit(0x66, rex, 0x0F, 0x6E, modrm)
+
+    def movq_r64_xmm(self, r64: int, xmm: int) -> None:
+        """movq r/m64, xmm（66 REX.W 0F 7E /r）— XMM 位模式回通用寄存器。"""
+        rex = 0x48
+        if xmm >= 8:
+            rex |= 4
+        if r64 >= 8:
+            rex |= 1
+        modrm = 0xC0 | ((r64 & 7) << 3) | (xmm & 7)
+        self.emit(0x66, rex, 0x0F, 0x7E, modrm)
+
+    def addsd(self, dst: int, src: int) -> None:
+        self._sse2_rr(0xF2, 0x58, dst, src)
+
+    def subsd(self, dst: int, src: int) -> None:
+        self._sse2_rr(0xF2, 0x5C, dst, src)
+
+    def mulsd(self, dst: int, src: int) -> None:
+        self._sse2_rr(0xF2, 0x59, dst, src)
+
+    def divsd(self, dst: int, src: int) -> None:
+        self._sse2_rr(0xF2, 0x5E, dst, src)
+
+    def sqrtsd(self, dst: int, src: int) -> None:
+        self._sse2_rr(0xF2, 0x51, dst, src)
+
+    def cvtsi2sd(self, xmm: int, r64: int) -> None:
+        """cvtsi2sd xmm, r/m64（F2 REX.W 0F 2A /r）— 有符号 64 位整 -> 双精度。"""
+        rex = 0x48
+        if xmm >= 8:
+            rex |= 4
+        if r64 >= 8:
+            rex |= 1
+        modrm = 0xC0 | ((xmm & 7) << 3) | (r64 & 7)
+        self.emit(0xF2, rex, 0x0F, 0x2A, modrm)
+
+    def cvttsd2si(self, r64: int, xmm: int) -> None:
+        """cvttsd2si r/m64, xmm（F2 REX.W 0F 2C /r）— 双精度 -> 有符号 64 位整（向零截断）。"""
+        rex = 0x48
+        if r64 >= 8:
+            rex |= 1
+        if xmm >= 8:
+            rex |= 4
+        modrm = 0xC0 | ((r64 & 7) << 3) | (xmm & 7)
+        self.emit(0xF2, rex, 0x0F, 0x2C, modrm)
+
+    def movabs_ri(self, reg: int, imm64: int) -> None:
+        """movabs r64, imm64（REX.W B8+r io）— 任意 64 位立即数（Float 位模式用）。"""
+        rex = 0x48 if reg < 8 else 0x49
+        self.emit(rex, 0xB8 + (reg & 7))
+        v = imm64 & 0xFFFFFFFFFFFFFFFF
+        for i in range(8):
+            self.emit((v >> (i * 8)) & 0xFF)
+
     def movzx_r_from_mem8(self, reg: int, base: int, disp: int = 0) -> None:
         rex, tail = self._mem_parts(reg, base, disp)
         self.emit(rex, 0x0F, 0xB6, tail)

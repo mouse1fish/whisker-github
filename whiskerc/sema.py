@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from . import ast_nodes as A
 from .diag import Diag
-from .typesys import (BOOL_TY, ERROR_TY, INT_TY, PTR_TY, STR_TY, VOID,
+from .typesys import (BOOL_TY, ERROR_TY, FLOAT_TY, INT_TY, PTR_TY, STR_TY, VOID,
                       VOID_TY, Ty, actorref, array_of, parse_type_name)
 
 ENTRY_ACTOR = "Main"
@@ -73,6 +73,14 @@ BUILTIN_SIGS: dict[str, tuple[list[Ty], Ty]] = {
     "screenshot": ([STR_TY], INT_TY),                   # 截屏写 BMP 文件
     "ptrToInt": ([PTR_TY], INT_TY),                     # 指针 -> 整数（身份变换，句柄/地址算术用）
     "intToPtr": ([INT_TY], PTR_TY),                     # 整数 -> 指针（身份变换）
+    # ---- Float（IEEE 754 位模式；显式 itof/ftoi 转换，不做隐式）----
+    "fadd": ([FLOAT_TY, FLOAT_TY], FLOAT_TY),
+    "fsub": ([FLOAT_TY, FLOAT_TY], FLOAT_TY),
+    "fmul": ([FLOAT_TY, FLOAT_TY], FLOAT_TY),
+    "fdiv": ([FLOAT_TY, FLOAT_TY], FLOAT_TY),
+    "fsqrt": ([FLOAT_TY], FLOAT_TY),
+    "itof": ([INT_TY], FLOAT_TY),
+    "ftoi": ([FLOAT_TY], INT_TY),
 }
 
 
@@ -498,11 +506,13 @@ class Sema:
 
     # ---------------- 常量表达式 ----------------
     def check_const_expr(self, e: A.Expr, what: str) -> None:
-        if isinstance(e, (A.IntLit, A.BoolLit, A.StrLit)):
+        if isinstance(e, (A.IntLit, A.BoolLit, A.StrLit, A.FloatLit)):
             if isinstance(e, A.IntLit):
                 e.ty = INT_TY
             elif isinstance(e, A.BoolLit):
                 e.ty = BOOL_TY
+            elif isinstance(e, A.FloatLit):
+                e.ty = FLOAT_TY
             else:
                 e.ty = STR_TY
             return
@@ -520,8 +530,10 @@ class Sema:
 
     # ---------------- 表达式 ----------------
     def check_expr(self, e: A.Expr) -> Ty:
-        if isinstance(e, (A.IntLit, A.BoolLit, A.StrLit)):
-            e.ty = INT_TY if isinstance(e, A.IntLit) else (BOOL_TY if isinstance(e, A.BoolLit) else STR_TY)
+        if isinstance(e, (A.IntLit, A.BoolLit, A.StrLit, A.FloatLit)):
+            e.ty = (INT_TY if isinstance(e, A.IntLit) else
+                    BOOL_TY if isinstance(e, A.BoolLit) else
+                    FLOAT_TY if isinstance(e, A.FloatLit) else STR_TY)
             return e.ty
 
         if isinstance(e, A.Ident):

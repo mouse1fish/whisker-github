@@ -36,6 +36,9 @@ CASES = {
     "tests/boot/boot_cast.wk": b"cast ok\n",           # ptrToInt/intToPtr
     "tests/boot/boot_str.wk": b"n=3 s=abc 7\n",        # 字符串内置
     "tests/boot/boot_arr.wk": b"0-9\n",                # 局部数组
+    # ---- 2026-11-06 固化：Float 类型（IEEE 754 位模式 + SSE2）----
+    "tests/boot/boot_float.wk":
+        b"9\n5\n14\n35\n4\n12345\n314\n1\n10\n0\n3\n9\n",  # 算术+字面量+SSE2 编码坑回归锚
 }
 
 ERR_MARKERS = ["期望", "未定义", "数组越界", "read fail", "异常", "缺少"]

@@ -152,6 +152,8 @@ def main() -> int:
         "rt_proc_free": "OFF_PROC_FREE",
         "rt_cmdline": "OFF_CMDLINE",
         "rt_sin16": "OFF_SIN16", "rt_cos16": "OFF_COS16",
+    "rt_fadd": "OFF_FADD", "rt_fsub": "OFF_FSUB", "rt_fmul": "OFF_FMUL", "rt_fdiv": "OFF_FDIV",
+    "rt_fsqrt": "OFF_FSQRT", "rt_itof": "OFF_ITOF", "rt_ftoi": "OFF_FTOI",
         "rt_win_open": "OFF_WIN_OPEN", "rt_win_present": "OFF_WIN_PRESENT",
         "rt_win_pump": "OFF_WIN_PUMP", "rt_win_close": "OFF_WIN_CLOSE",
         "rt_key_async": "OFF_KEY_ASYNC",
